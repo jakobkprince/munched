@@ -71,3 +71,21 @@
 - Files created: hooks/use-location.ts, hooks/use-restaurants.ts, hooks/use-dishes.ts, hooks/use-restaurant-actions.ts, hooks/use-dish-actions.ts, hooks/use-tags.ts, hooks/use-photos.ts
 - Spec cross-check: addToMunched carries over eat-list notes + deletes eat-list row; deleteFromEatList does not touch dishes; reMunch inserts new log
 - TypeScript check: pass
+
+## Phase 8: Restaurant Search — COMPLETE
+- Files created: components/restaurant-search.tsx, app/search.tsx
+- Autocomplete: debounced 300ms, calls places-autocomplete Edge Function
+- Place details: calls places-details Edge Function, constructs Apple Maps + Yelp URLs
+- Auto-suggests tags from Google Places types array
+- Session token generated per search session, rotated after place selection
+- TypeScript check: pass
+- Expo export: pass
+
+## Phase 9: Restaurant Page — COMPLETE
+- Files created: components/star-rating.tsx, components/tag-picker-sheet.tsx, components/add-to-eat-list-sheet.tsx, components/add-to-munched-sheet.tsx, components/previous-munches-sheet.tsx, app/restaurant/[id].tsx
+- Button states: not-in-list (Add to Eat-List + Add to Munched), eat-list-only (Add to Munched), munched (Re-Munch)
+- 3-dot menu: Eat-List (Edit/Delete), Munched (Edit/Delete/View Previous Munches)
+- Photos and notes aggregated from all logs
+- Tag picker with search and grouping
+- TypeScript check: pass
+- Expo export: pass
