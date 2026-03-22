@@ -47,3 +47,12 @@
   - --no-verify-jwt so the app can call functions with just the anon key
   - CORS headers included for web compatibility
   - supabase/functions excluded from tsconfig.json to avoid Deno/Node type conflicts
+
+## Phase 5: Navigation Structure — COMPLETE
+- Files created: all screens listed in build order (stubs)
+- Deleted template files: app/(tabs)/index.tsx, app/(tabs)/two.tsx, app/modal.tsx
+- Tab bar: Munched / Eat-List / Map with Ionicons
+- Stack navigators within each tab (munched/_layout.tsx, eat-list/_layout.tsx)
+- auth/sign-in and auth/sign-up stubs ready for Phase 6
+- TypeScript check: pass
+- Expo export: pass
