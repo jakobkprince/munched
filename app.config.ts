@@ -17,9 +17,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'com.munched.app',
-    config: {
-      googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY,
-    },
   },
   android: {
     adaptiveIcon: {
@@ -29,11 +26,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       backgroundColor: '#E6F4FE',
     },
     package: 'com.munched.app',
-    config: {
-      googleMaps: {
-        apiKey: process.env.GOOGLE_MAPS_API_KEY,
-      },
-    },
   },
   web: {
     bundler: 'metro',
