@@ -89,3 +89,18 @@
 - Tag picker with search and grouping
 - TypeScript check: pass
 - Expo export: pass
+
+## Phase 10: Dish Page — COMPLETE
+- Files modified: app/dish/[id].tsx
+- Inline data loading (no separate hook needed): fetches dish + joined restaurant, eat_list_dishes, dish_logs, dish_tags, and photos in one async function
+- Header: dish name + tappable restaurant name navigating to /restaurant/[restaurantId]
+- Tags section with Add Tag button (shown when dish is in any list); long-press to remove tag
+- Munched display: most recent StarRating, all photos sorted by recency, all notes with log dates sorted by recency
+- Eat-List display: notes from eat_list_dishes entry
+- Action buttons: Add to Munched (not-in-list or eat-list-only), Re-Munch (munched state)
+- AddToMunchedSheet passed showVibeRating={false} — dishes have no vibe rating
+- 3-dot menu: ActionSheetIOS on iOS, Alert.alert fallback on Android; Munched state adds "View Previous Munches" option
+- PreviousMunchesSheet and TagPickerSheet reused from Phase 9 components
+- Key decision: dish status determined inline (inMunched = dish_logs.length > 0, inEatList = eat_list_dishes row exists)
+- TypeScript check: pass
+- Expo export: pass
