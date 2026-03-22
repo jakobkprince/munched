@@ -56,3 +56,18 @@
 - auth/sign-in and auth/sign-up stubs ready for Phase 6
 - TypeScript check: pass
 - Expo export: pass
+
+## Phase 6: Auth — COMPLETE
+- Files created/modified: hooks/use-auth.ts, app/_layout.tsx, app/auth/sign-in.tsx, app/auth/sign-up.tsx
+- useAuth hook: getSession on mount + onAuthStateChange subscription
+- AuthGate component in root layout: redirects unauthed → /auth/sign-in, redirects authed away from auth screens
+- Sign in: email/password with Alert error handling
+- Sign up: email/password/confirm with 6-char minimum, confirmation email alert
+- Brand color: #FF6B35
+- TypeScript check: pass
+- Expo export: pass
+
+## Phase 7: Data Hooks — COMPLETE
+- Files created: hooks/use-location.ts, hooks/use-restaurants.ts, hooks/use-dishes.ts, hooks/use-restaurant-actions.ts, hooks/use-dish-actions.ts, hooks/use-tags.ts, hooks/use-photos.ts
+- Spec cross-check: addToMunched carries over eat-list notes + deletes eat-list row; deleteFromEatList does not touch dishes; reMunch inserts new log
+- TypeScript check: pass
