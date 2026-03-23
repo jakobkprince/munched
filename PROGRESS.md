@@ -137,3 +137,42 @@
   - listContent paddingBottom: 100 to ensure last card isn't hidden behind FAB
 - TypeScript check: pass (0 errors)
 - Expo export: pass
+
+## Phase 13: Map Tab — COMPLETE
+- Files modified: app/(tabs)/map.tsx
+- MapView from react-native-maps fills the screen; overlay contains toggle + filters
+- Map centers on user location (useLocation hook); falls back to San Francisco (37.7749, -122.4194)
+- Toggle: Eat-List (default) | Munched; switches data source and marker set
+- Eat-List markers: Callout shows restaurant name only
+- Munched markers: Callout shows restaurant name + StarRating (read-only, size 14)
+- Tapping any callout navigates to /restaurant/[id] via router.push
+- TagFilter reused from components/tag-filter.tsx; applies to both views
+- Rating filter (Munched only): horizontal chips "All | 2+ | 3+ | 4+ | 5"; filters on latestLog.rating
+- Restaurants with null lat or lng are excluded from markers
+- useMunchedRestaurants + useEatListRestaurants called with sortField: 'recency', direction: 'desc', userLocation: null
+- Key decisions:
+  - Controls rendered as position: absolute overlay at top with paddingTop: 60 for safe area clearance
+  - Toggle uses background color swap (white/inactive vs #FF6B35/active) within a shared rounded container
+  - TagFilter wrapped in a semi-transparent rounded card for legibility over map
+  - Rating filter "5" uses exact equality check (=== 5), all other thresholds use >=
+- TypeScript check: pass (0 errors)
+- Expo export: pass
+
+---
+
+## BUILD COMPLETE
+
+All 13 phases implemented. The Munch app is fully built:
+- Phase 1: Scaffolding
+- Phase 2: Database Schema
+- Phase 3: TypeScript Types & Constants
+- Phase 4: Supabase Client & Edge Functions
+- Phase 5: Navigation Structure
+- Phase 6: Auth
+- Phase 7: Data Hooks
+- Phase 8: Restaurant Search
+- Phase 9: Restaurant Page
+- Phase 10: Dish Page
+- Phase 11: Munched Tab Screens
+- Phase 12: Eat-List Tab Screens
+- Phase 13: Map Tab
