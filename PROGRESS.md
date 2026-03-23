@@ -104,3 +104,20 @@
 - Key decision: dish status determined inline (inMunched = dish_logs.length > 0, inEatList = eat_list_dishes row exists)
 - TypeScript check: pass
 - Expo export: pass
+
+## Phase 11: Munched Tab Screens — COMPLETE
+- Files created: components/restaurant-card.tsx, components/dish-card.tsx, components/sort-picker.tsx, components/tag-filter.tsx
+- Files modified: app/(tabs)/munched/index.tsx, app/(tabs)/munched/dishes.tsx
+- RestaurantCard: photo thumbnail (Supabase Storage public URL), name, StarRating (read-only), formatted log date, notes preview (80 chars)
+- DishCard: dish name, tappable restaurant name link, StarRating (read-only); tapping whole card navigates to /dish/[id]
+- SortPicker: ActionSheetIOS on iOS, Alert.alert fallback on Android; shows current selection with ↑/↓ direction indicator
+- TagFilter: horizontal chip scroll with "+ Tags" opener; full-screen modal with search + grouped tags; selected tags highlighted #FF6B35 and tappable to deselect
+- MunchedRestaurants (index.tsx): header with count badge, toggle row (Restaurants active), search bar, SortPicker + TagFilter, FlatList of RestaurantCards; uses useMunchedRestaurants + useLocation
+- MunchedDishes (dishes.tsx): same layout, toggle row (Dishes active), FlatList of DishCards; uses useMunchedDishes + useLocation; no Vibe sort option
+- Key decisions:
+  - SORT_OPTIONS deduped by field so each field appears once in the picker; both directions selectable per field
+  - Dishes toggle uses router.back() to return to restaurants index
+  - Client-side name filter applied after hook data using useMemo
+  - Count badge reflects hook data length (respects tag filter, not search)
+- TypeScript check: pass (0 errors)
+- Expo export: pass
