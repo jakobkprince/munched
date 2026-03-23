@@ -121,3 +121,19 @@
   - Count badge reflects hook data length (respects tag filter, not search)
 - TypeScript check: pass (0 errors)
 - Expo export: pass
+
+## Phase 12: Eat-List Tab Screens — COMPLETE
+- Files modified: app/(tabs)/eat-list/index.tsx, app/(tabs)/eat-list/dishes.tsx
+- EatListRestaurantCard (inline): restaurant name, date added (right-aligned), notes preview (80 chars) or "No notes" placeholder; tapping navigates to /restaurant/[id]
+- EatListDishCard (inline): dish name, date added (right-aligned), tappable restaurant name link (orange, navigates to /restaurant/[restaurantId]), notes preview or "No notes"; tapping card navigates to /dish/[id]
+- EatListRestaurants (index.tsx): header "Eat-List" + count badge, toggle row (Restaurants active → Dishes navigates to dishes.tsx), search bar, SortPicker + TagFilter, FlatList, FAB → /search; uses useEatListRestaurants + useLocation
+- EatListDishes (dishes.tsx): same layout, toggle row (Dishes active → Restaurants uses router.back()), FlatList of dish cards, FAB → /search; uses useEatListDishes + useLocation
+- Sort options: Recency ↑↓, Distance ↑↓ (default: recency desc); no rating/vibe sort per spec
+- Key decisions:
+  - Card UI built inline in each screen (not shared components) — Eat-List cards differ from Munched cards (no rating, show date added instead)
+  - SORT_OPTIONS deduped by field using same pattern as Phase 11
+  - Dishes toggle uses router.back() to return to restaurants index
+  - Count badge reflects hook data length (respects tag filter, not search)
+  - listContent paddingBottom: 100 to ensure last card isn't hidden behind FAB
+- TypeScript check: pass (0 errors)
+- Expo export: pass
