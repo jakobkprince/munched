@@ -2,6 +2,12 @@ import { supabase } from '../lib/supabase';
 import { Restaurant, RestaurantLogInput } from '../types';
 import { PLACES_TYPE_TO_TAG } from '../constants/tags';
 
+async function getUserId(): Promise<string> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user?.id) throw new Error('Not authenticated');
+  return session.user.id;
+}
+
 export function useRestaurantActions() {
   async function upsertRestaurant(restaurant: Omit<Restaurant, 'id' | 'created_at'>): Promise<string> {
     const { data, error } = await supabase
@@ -14,13 +20,15 @@ export function useRestaurantActions() {
   }
 
   async function addToEatList(restaurantId: string, notes?: string): Promise<void> {
+    const userId = await getUserId();
     const { error } = await supabase
       .from('eat_list_restaurants')
-      .insert({ restaurant_id: restaurantId, notes: notes ?? null });
+      .insert({ restaurant_id: restaurantId, user_id: userId, notes: notes ?? null });
     if (error) throw error;
   }
 
   async function addToMunched(restaurantId: string, log: RestaurantLogInput): Promise<void> {
+    const userId = await getUserId();
     // Check if eat-list entry exists — if so, carry over notes + tags, then delete it
     const { data: eatListEntry } = await supabase
       .from('eat_list_restaurants')
@@ -28,12 +36,12 @@ export function useRestaurantActions() {
       .eq('restaurant_id', restaurantId)
       .maybeSingle();
 
-    // Get existing tags from eat-list entry context (tags are on the restaurant, not the eat-list entry)
     // Insert the log
     const { data: newLog, error: logError } = await supabase
       .from('restaurant_logs')
       .insert({
         restaurant_id: restaurantId,
+        user_id: userId,
         rating: log.rating,
         vibe_rating: log.vibe_rating ?? null,
         notes: log.notes ?? eatListEntry?.notes ?? null,
@@ -59,10 +67,12 @@ export function useRestaurantActions() {
   }
 
   async function reMunch(restaurantId: string, log: RestaurantLogInput): Promise<void> {
+    const userId = await getUserId();
     const { data: newLog, error } = await supabase
       .from('restaurant_logs')
       .insert({
         restaurant_id: restaurantId,
+        user_id: userId,
         rating: log.rating,
         vibe_rating: log.vibe_rating ?? null,
         notes: log.notes ?? null,

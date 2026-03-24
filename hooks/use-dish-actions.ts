@@ -1,6 +1,12 @@
 import { supabase } from '../lib/supabase';
 import { DishLogInput } from '../types';
 
+async function getUserId(): Promise<string> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user?.id) throw new Error('Not authenticated');
+  return session.user.id;
+}
+
 export function useDishActions() {
   async function addDish(restaurantId: string, name: string): Promise<string> {
     const { data, error } = await supabase
@@ -13,13 +19,15 @@ export function useDishActions() {
   }
 
   async function addToEatList(dishId: string, notes?: string): Promise<void> {
+    const userId = await getUserId();
     const { error } = await supabase
       .from('eat_list_dishes')
-      .insert({ dish_id: dishId, notes: notes ?? null });
+      .insert({ dish_id: dishId, user_id: userId, notes: notes ?? null });
     if (error) throw error;
   }
 
   async function addToMunched(dishId: string, log: DishLogInput): Promise<void> {
+    const userId = await getUserId();
     const { data: eatListEntry } = await supabase
       .from('eat_list_dishes')
       .select('id, notes')
@@ -30,6 +38,7 @@ export function useDishActions() {
       .from('dish_logs')
       .insert({
         dish_id: dishId,
+        user_id: userId,
         rating: log.rating,
         notes: log.notes ?? eatListEntry?.notes ?? null,
         log_date: log.log_date,
@@ -54,9 +63,10 @@ export function useDishActions() {
   }
 
   async function reMunch(dishId: string, log: DishLogInput): Promise<void> {
+    const userId = await getUserId();
     const { data: newLog, error } = await supabase
       .from('dish_logs')
-      .insert({ dish_id: dishId, rating: log.rating, notes: log.notes ?? null, log_date: log.log_date })
+      .insert({ dish_id: dishId, user_id: userId, rating: log.rating, notes: log.notes ?? null, log_date: log.log_date })
       .select('id')
       .single();
     if (error) throw error;
