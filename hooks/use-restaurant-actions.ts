@@ -10,13 +10,25 @@ async function getUserId(): Promise<string> {
 
 export function useRestaurantActions() {
   async function upsertRestaurant(restaurant: Omit<Restaurant, 'id' | 'created_at'>): Promise<string> {
-    const { data, error } = await supabase
+    // Try insert first; if the restaurant already exists (unique conflict), select it instead.
+    // Avoids upsert which triggers UPDATE RLS check.
+    const { data: inserted, error: insertError } = await supabase
       .from('restaurants')
-      .upsert(restaurant, { onConflict: 'google_place_id' })
+      .insert(restaurant)
       .select('id')
       .single();
-    if (error) throw error;
-    return data.id;
+    if (!insertError) return inserted.id;
+
+    if (insertError.code === '23505') {
+      const { data: existing, error: selectError } = await supabase
+        .from('restaurants')
+        .select('id')
+        .eq('google_place_id', restaurant.google_place_id)
+        .single();
+      if (selectError) throw selectError;
+      return existing.id;
+    }
+    throw insertError;
   }
 
   async function addToEatList(restaurantId: string, notes?: string): Promise<void> {
