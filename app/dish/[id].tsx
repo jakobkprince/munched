@@ -84,7 +84,7 @@ export default function DishPage() {
 
   useEffect(() => { loadDish(); }, [loadDish]);
 
-  if (loading || !dish || !restaurant) {
+  if (!dish || !restaurant) {
     return <View style={styles.center}><Text>Loading...</Text></View>;
   }
 

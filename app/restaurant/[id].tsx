@@ -51,7 +51,7 @@ export default function RestaurantPage() {
 
   useEffect(() => { loadLogsAndPhotos(); }, [loadLogsAndPhotos]);
 
-  if (loading || !restaurant) {
+  if (!restaurant) {
     return <View style={styles.center}><Text>Loading...</Text></View>;
   }
 
