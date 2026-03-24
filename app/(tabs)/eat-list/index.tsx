@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
+import { useFocusEffect } from 'expo-router';
 import {
   View,
   Text,
@@ -106,7 +107,9 @@ export default function EatListRestaurants() {
   const [search, setSearch] = useState('');
 
   const { location } = useLocation();
-  const { data, loading, error } = useEatListRestaurants(sortField, sortDirection, tagFilter, location);
+  const { data, loading, error, refresh } = useEatListRestaurants(sortField, sortDirection, tagFilter, location);
+
+  useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
 
   const filtered = useMemo<EatListRestaurantView[]>(() => {
     if (!search.trim()) return data;

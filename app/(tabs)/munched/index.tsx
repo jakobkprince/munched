@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
+import { useFocusEffect } from 'expo-router';
 import {
   View,
   Text,
@@ -36,7 +37,9 @@ export default function MunchedRestaurants() {
   const [search, setSearch] = useState('');
 
   const { location } = useLocation();
-  const { data, loading, error } = useMunchedRestaurants(sortField, sortDirection, tagFilter, location);
+  const { data, loading, error, refresh } = useMunchedRestaurants(sortField, sortDirection, tagFilter, location);
+
+  useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
 
   const filtered = useMemo<MunchedRestaurant[]>(() => {
     if (!search.trim()) return data;
