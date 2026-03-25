@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, ScrollView,
+  View, Text, TouchableOpacity, ScrollView,
   StyleSheet, Modal, KeyboardAvoidingView, Platform, Image, Alert,
 } from 'react-native';
+import { BulletTextInput } from './bullet-text-input';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { StarRating } from './star-rating';
@@ -10,6 +11,8 @@ import { StarRating } from './star-rating';
 interface Props {
   visible: boolean;
   showVibeRating?: boolean;
+  initialRating?: number;
+  initialVibeRating?: number;
   initialNotes?: string;
   onConfirm: (data: { rating: number; vibe_rating?: number; notes: string; log_date: string; photoUris: string[] }) => void;
   onClose: () => void;
@@ -17,22 +20,24 @@ interface Props {
   title?: string;
 }
 
-export function AddToMunchedSheet({ visible, showVibeRating = true, initialNotes = '', onConfirm, onClose, loading, title = 'Log to Munched' }: Props) {
-  const [rating, setRating] = useState(0);
-  const [vibeRating, setVibeRating] = useState(0);
+export function AddToMunchedSheet({ visible, showVibeRating = true, initialRating = 0, initialVibeRating = 0, initialNotes = '', onConfirm, onClose, loading, title = 'Log to Munched' }: Props) {
+  const [rating, setRating] = useState(initialRating);
+  const [vibeRating, setVibeRating] = useState(initialVibeRating);
   const [notes, setNotes] = useState(initialNotes);
   const [photoUris, setPhotoUris] = useState<string[]>([]);
   const logDate = new Date().toISOString().split('T')[0];
 
-  function reset() {
-    setRating(0);
-    setVibeRating(0);
-    setNotes(initialNotes);
-    setPhotoUris([]);
-  }
+  // Sync state whenever the sheet opens so initial values are always fresh
+  useEffect(() => {
+    if (visible) {
+      setRating(initialRating);
+      setVibeRating(initialVibeRating);
+      setNotes(initialNotes);
+      setPhotoUris([]);
+    }
+  }, [visible]);
 
   function handleClose() {
-    reset();
     onClose();
   }
 
@@ -48,7 +53,6 @@ export function AddToMunchedSheet({ visible, showVibeRating = true, initialNotes
       log_date: logDate,
       photoUris,
     });
-    reset();
   }
 
   async function pickPhoto() {
@@ -84,7 +88,7 @@ export function AddToMunchedSheet({ visible, showVibeRating = true, initialNotes
           )}
 
           <Text style={[styles.label, { marginTop: 20 }]}>Notes</Text>
-          <TextInput
+          <BulletTextInput
             style={styles.input}
             value={notes}
             onChangeText={setNotes}

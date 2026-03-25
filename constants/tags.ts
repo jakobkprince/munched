@@ -82,3 +82,6 @@ export const PLACES_TYPE_TO_TAG: Record<string, string> = {
   bar: 'Bar',
   cocktail_bar: 'Cocktail',
 };
+
+/** Tags that represent cuisine/food type — derived from Google Places types */
+export const CUISINE_TAGS: Set<string> = new Set(Object.values(PLACES_TYPE_TO_TAG));

@@ -8,25 +8,24 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useMunchedRestaurants } from '../../../hooks/use-restaurants';
 import { useLocation } from '../../../hooks/use-location';
 import { RestaurantCard } from '../../../components/restaurant-card';
 import { SortPicker } from '../../../components/sort-picker';
 import { TagFilter } from '../../../components/tag-filter';
 import {
-  MUNCHED_RESTAURANT_SORT_OPTIONS,
+  SORT_FIELD_OPTIONS,
+  DEFAULT_SORT_DIRECTIONS,
   DEFAULT_MUNCHED_RESTAURANT_SORT,
   MunchedRestaurantSortField,
   SortDirection,
 } from '../../../constants/sort-options';
 import { MunchedRestaurant } from '../../../types';
-
-const SORT_OPTIONS = MUNCHED_RESTAURANT_SORT_OPTIONS.map((o) => ({
-  label: o.label.replace(/ (High to Low|Low to High|Most Recent|Oldest First|Nearest First|Farthest First)$/, ''),
-  value: o.field,
-})).filter((o, i, arr) => arr.findIndex((x) => x.value === o.value) === i);
 
 export default function MunchedRestaurants() {
   const router = useRouter();
@@ -47,13 +46,16 @@ export default function MunchedRestaurants() {
     return data.filter((r) => r.restaurant.name.toLowerCase().includes(q));
   }, [data, search]);
 
-  function handleSortChange(value: string, direction: 'asc' | 'desc') {
+  function handleSortChange(value: string) {
     setSortField(value as MunchedRestaurantSortField);
-    setSortDirection(direction);
+    setSortDirection(DEFAULT_SORT_DIRECTIONS[value] ?? 'desc');
   }
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Munched</Text>
@@ -62,61 +64,80 @@ export default function MunchedRestaurants() {
         </View>
       </View>
 
-      {/* Toggle */}
-      <View style={styles.toggle}>
-        <View style={[styles.toggleBtn, styles.toggleBtnActive]}>
-          <Text style={[styles.toggleText, styles.toggleTextActive]}>Restaurants</Text>
-        </View>
+      {/* List + FAB */}
+      <View style={styles.listWrapper}>
+        {loading ? (
+          <ActivityIndicator style={styles.spinner} color="#FF6B35" />
+        ) : error ? (
+          <Text style={styles.errorText}>{error}</Text>
+        ) : (
+          <FlatList
+            data={filtered}
+            keyExtractor={(item) => item.restaurant.id}
+            renderItem={({ item }) => <RestaurantCard item={item} />}
+            contentContainerStyle={styles.listContent}
+            ListEmptyComponent={
+              <Text style={styles.emptyText}>
+                {search.trim() ? 'No restaurants match your search.' : 'No munched restaurants yet.'}
+              </Text>
+            }
+            keyboardShouldPersistTaps="handled"
+          />
+        )}
         <TouchableOpacity
-          style={styles.toggleBtn}
-          onPress={() => router.push('/(tabs)/munched/dishes')}
-          activeOpacity={0.7}
+          style={styles.fab}
+          onPress={() => router.push('/search')}
+          activeOpacity={0.85}
         >
-          <Text style={styles.toggleText}>Dishes</Text>
+          <Text style={styles.fabIcon}>+</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Search */}
-      <TextInput
-        style={styles.searchBar}
-        placeholder="Search restaurants…"
-        value={search}
-        onChangeText={setSearch}
-        clearButtonMode="while-editing"
-        returnKeyType="search"
-      />
+      {/* Bottom controls */}
+      <View style={styles.bottomBar}>
+        <View style={styles.toggle}>
+          <View style={[styles.toggleBtn, styles.toggleBtnActive]}>
+            <Text style={[styles.toggleText, styles.toggleTextActive]}>Restaurants</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.toggleBtn}
+            onPress={() => router.push('/(tabs)/munched/dishes')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.toggleText}>Dishes</Text>
+          </TouchableOpacity>
+        </View>
 
-      {/* Sort + Tag filters */}
-      <View style={styles.filterRow}>
-        <SortPicker
-          options={SORT_OPTIONS}
-          value={sortField}
-          direction={sortDirection}
-          onChange={handleSortChange}
+        <TextInput
+          style={styles.searchBar}
+          placeholder="Search restaurants…"
+          value={search}
+          onChangeText={setSearch}
+          clearButtonMode="while-editing"
+          returnKeyType="search"
         />
+
+        <View style={styles.filterRow}>
+          <SortPicker
+            options={SORT_FIELD_OPTIONS}
+            value={sortField}
+            onChange={handleSortChange}
+          />
+          <TouchableOpacity
+            style={styles.dirButton}
+            onPress={() => setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name={sortDirection === 'asc' ? 'arrow-up' : 'arrow-down'}
+              size={16}
+              color="#FF6B35"
+            />
+          </TouchableOpacity>
+        </View>
+        <TagFilter selectedTags={tagFilter} onChange={setTagFilter} />
       </View>
-      <TagFilter selectedTags={tagFilter} onChange={setTagFilter} />
-
-      {/* List */}
-      {loading ? (
-        <ActivityIndicator style={styles.spinner} color="#FF6B35" />
-      ) : error ? (
-        <Text style={styles.errorText}>{error}</Text>
-      ) : (
-        <FlatList
-          data={filtered}
-          keyExtractor={(item) => item.restaurant.id}
-          renderItem={({ item }) => <RestaurantCard item={item} />}
-          contentContainerStyle={styles.listContent}
-          ListEmptyComponent={
-            <Text style={styles.emptyText}>
-              {search.trim() ? 'No restaurants match your search.' : 'No munched restaurants yet.'}
-            </Text>
-          }
-          keyboardShouldPersistTaps="handled"
-        />
-      )}
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -152,11 +173,67 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 13,
   },
+  spinner: {
+    marginTop: 60,
+  },
+  errorText: {
+    color: '#c00',
+    textAlign: 'center',
+    marginTop: 40,
+    paddingHorizontal: 24,
+    fontSize: 14,
+  },
+  listWrapper: {
+    flex: 1,
+  },
+  listContent: {
+    paddingTop: 8,
+    paddingBottom: 80,
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 16,
+    right: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FF6B35',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
+  fabIcon: {
+    fontSize: 30,
+    color: '#fff',
+    lineHeight: 34,
+    fontWeight: '300',
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: '#888',
+    marginTop: 60,
+    fontSize: 15,
+  },
+  bottomBar: {
+    backgroundColor: '#fff',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#d0d0d0',
+    paddingTop: 10,
+    paddingBottom: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: -2 },
+    elevation: 8,
+  },
   toggle: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
     paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingBottom: 8,
     gap: 8,
   },
   toggleBtn: {
@@ -178,7 +255,7 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   searchBar: {
-    margin: 12,
+    marginHorizontal: 12,
     marginBottom: 4,
     padding: 11,
     backgroundColor: '#fff',
@@ -194,24 +271,14 @@ const styles = StyleSheet.create({
     gap: 8,
     alignItems: 'center',
   },
-  spinner: {
-    marginTop: 60,
-  },
-  errorText: {
-    color: '#c00',
-    textAlign: 'center',
-    marginTop: 40,
-    paddingHorizontal: 24,
-    fontSize: 14,
-  },
-  listContent: {
-    paddingTop: 4,
-    paddingBottom: 32,
-  },
-  emptyText: {
-    textAlign: 'center',
-    color: '#888',
-    marginTop: 60,
-    fontSize: 15,
+  dirButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#fff3ee',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#FF6B35',
   },
 });

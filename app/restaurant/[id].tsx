@@ -17,10 +17,11 @@ import { AddToMunchedSheet } from '../../components/add-to-munched-sheet';
 import { TagPickerSheet } from '../../components/tag-picker-sheet';
 import { PreviousMunchesSheet } from '../../components/previous-munches-sheet';
 import { supabase } from '../../lib/supabase';
+import { CUISINE_TAGS } from '../../constants/tags';
 import { RestaurantLog, Photo } from '../../types';
 
 export default function RestaurantPage() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
   const { restaurant, status, tags, loading, refresh } = useRestaurant(id);
   const { dishes, refresh: refreshDishes } = useRestaurantDishes(id);
   const actions = useRestaurantActions();
@@ -32,6 +33,7 @@ export default function RestaurantPage() {
   const [munchedSheet, setMunchedSheet] = useState(false);
   const [tagSheet, setTagSheet] = useState(false);
   const [prevMunchesSheet, setPrevMunchesSheet] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [allLogs, setAllLogs] = useState<RestaurantLog[]>([]);
   const [allPhotos, setAllPhotos] = useState<Photo[]>([]);
   const [actionLoading, setActionLoading] = useState(false);
@@ -40,7 +42,7 @@ export default function RestaurantPage() {
   const loadLogsAndPhotos = useCallback(async () => {
     if (!status.inMunched) return;
     const [logsRes, photosRes] = await Promise.all([
-      supabase.from('restaurant_logs').select('*').eq('restaurant_id', id).order('log_date', { ascending: false }),
+      supabase.from('restaurant_logs').select('*').eq('restaurant_id', id).order('log_date', { ascending: false }).order('created_at', { ascending: false }),
       supabase.from('photos').select('*').eq('log_type', 'restaurant_log'),
     ]);
     const logs = logsRes.data ?? [];
@@ -129,8 +131,51 @@ export default function RestaurantPage() {
     }
   }
 
+  async function handleEditMunched(data: { rating: number; vibe_rating?: number; notes: string; log_date: string; photoUris: string[] }) {
+    if (!latestLog) return;
+    setActionLoading(true);
+    try {
+      await actions.editRestaurantLog(latestLog.id, {
+        rating: data.rating,
+        vibe_rating: data.vibe_rating,
+        notes: data.notes,
+        log_date: data.log_date,
+      });
+      await refresh();
+      await loadLogsAndPhotos();
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : 'Failed to edit');
+    } finally {
+      setActionLoading(false);
+      setMunchedSheet(false);
+      setIsEditMode(false);
+    }
+  }
+
+  async function handleEditEatList(notes: string) {
+    if (!status.eatListEntry) return;
+    setActionLoading(true);
+    try {
+      await actions.editEatListEntry(status.eatListEntry.id, notes);
+      await refresh();
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : 'Failed to edit');
+    } finally {
+      setActionLoading(false);
+      setEatListSheet(false);
+      setIsEditMode(false);
+    }
+  }
+
   async function handleMenuAction(action: string) {
-    if (action === 'Delete') {
+    if (action === 'Edit') {
+      setIsEditMode(true);
+      if (status.inMunched) {
+        setMunchedSheet(true);
+      } else if (status.inEatList) {
+        setEatListSheet(true);
+      }
+    } else if (action === 'Delete') {
       Alert.alert('Delete', `Remove this restaurant from ${status.inEatList ? 'Eat-List' : 'Munched'}?`, [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -158,7 +203,7 @@ export default function RestaurantPage() {
           const dishId = await dishActions.addDish(id, name.trim());
           Alert.alert('Add to...', '', [
             { text: 'Eat-List', onPress: async () => { await dishActions.addToEatList(dishId); refreshDishes(); } },
-            { text: 'Munched', onPress: () => router.push(`/dish/${dishId}`) },
+            { text: 'Munched', onPress: () => router.push(`/dish/${dishId}${from ? `?from=${from}` : ''}`) },
             { text: 'Cancel', style: 'cancel' },
           ]);
         } catch (e) {
@@ -171,6 +216,14 @@ export default function RestaurantPage() {
   const inAnyList = status.inEatList || status.inMunched;
 
   return (
+    <View style={styles.page}>
+      {from && (
+        <View style={styles.contextBanner}>
+          <Text style={styles.contextBannerText}>
+            {from === 'munched' ? 'Munched' : 'Eat-List'}
+          </Text>
+        </View>
+      )}
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Header */}
       <View style={styles.headerRow}>
@@ -183,6 +236,14 @@ export default function RestaurantPage() {
       </View>
 
       {restaurant.address && <Text style={styles.address}>{restaurant.address}</Text>}
+
+      {/* Cuisine */}
+      {(() => {
+        const cuisineTags = tags.filter((t) => CUISINE_TAGS.has(t));
+        return cuisineTags.length > 0 ? (
+          <Text style={styles.cuisine}>{cuisineTags.join(' · ')}</Text>
+        ) : null;
+      })()}
 
       {/* Links */}
       <View style={styles.linksRow}>
@@ -281,22 +342,20 @@ export default function RestaurantPage() {
       )}
 
       {/* Dishes */}
-      {inAnyList && (
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Dishes</Text>
-            <TouchableOpacity onPress={handleAddDish}>
-              <Text style={styles.addBtn}>+ Add Dish</Text>
-            </TouchableOpacity>
-          </View>
-          {dishes.map((dish) => (
-            <TouchableOpacity key={dish.id} style={styles.dishRow} onPress={() => router.push(`/dish/${dish.id}`)}>
-              <Text style={styles.dishName}>{dish.name}</Text>
-              <Ionicons name="chevron-forward" size={16} color="#ccc" />
-            </TouchableOpacity>
-          ))}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Dishes</Text>
+          <TouchableOpacity onPress={handleAddDish}>
+            <Text style={styles.addBtn}>+ Add Dish</Text>
+          </TouchableOpacity>
         </View>
-      )}
+        {dishes.map((dish) => (
+          <TouchableOpacity key={dish.id} style={styles.dishRow} onPress={() => router.push(`/dish/${dish.id}${from ? `?from=${from}` : ''}`)}>
+            <Text style={styles.dishName}>{dish.name}</Text>
+            <Ionicons name="chevron-forward" size={16} color="#ccc" />
+          </TouchableOpacity>
+        ))}
+      </View>
 
       {/* Action buttons */}
       <View style={styles.actionArea}>
@@ -325,18 +384,22 @@ export default function RestaurantPage() {
       {/* Sheets */}
       <AddToEatListSheet
         visible={eatListSheet}
-        onConfirm={handleAddToEatList}
-        onClose={() => setEatListSheet(false)}
+        initialNotes={isEditMode ? (status.eatListEntry?.notes ?? '') : ''}
+        title={isEditMode ? 'Edit Eat-List Entry' : 'Add to Eat-List'}
+        onConfirm={isEditMode ? handleEditEatList : handleAddToEatList}
+        onClose={() => { setEatListSheet(false); setIsEditMode(false); }}
         loading={actionLoading}
       />
       <AddToMunchedSheet
         visible={munchedSheet}
         showVibeRating
-        initialNotes={status.eatListEntry?.notes ?? ''}
-        onConfirm={status.inMunched ? handleReMunch : handleAddToMunched}
-        onClose={() => setMunchedSheet(false)}
+        initialRating={isEditMode ? (latestLog?.rating ?? 0) : 0}
+        initialVibeRating={isEditMode ? (latestLog?.vibe_rating ?? 0) : 0}
+        initialNotes={isEditMode ? (latestLog?.notes ?? '') : (status.eatListEntry?.notes ?? '')}
+        onConfirm={isEditMode ? handleEditMunched : (status.inMunched ? handleReMunch : handleAddToMunched)}
+        onClose={() => { setMunchedSheet(false); setIsEditMode(false); }}
         loading={actionLoading}
-        title={status.inMunched ? 'Re-Munch' : 'Log to Munched'}
+        title={isEditMode ? 'Edit Munch' : (status.inMunched ? 'Re-Munch' : 'Log to Munched')}
       />
       <TagPickerSheet
         visible={tagSheet}
@@ -347,9 +410,11 @@ export default function RestaurantPage() {
       <PreviousMunchesSheet
         visible={prevMunchesSheet}
         logs={allLogs}
+        photos={allPhotos}
         onClose={() => setPrevMunchesSheet(false)}
       />
     </ScrollView>
+    </View>
   );
 }
 
@@ -358,12 +423,16 @@ function formatDate(dateStr: string): string {
 }
 
 const styles = StyleSheet.create({
+  page: { flex: 1, backgroundColor: '#fff' },
+  contextBanner: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 8, backgroundColor: '#fff8f5', borderBottomWidth: 1, borderBottomColor: '#ffe0d0' },
+  contextBannerText: { fontSize: 13, fontWeight: '700', color: '#FF6B35', textTransform: 'uppercase', letterSpacing: 0.5 },
   container: { flex: 1, backgroundColor: '#fff' },
   content: { padding: 20, paddingBottom: 40 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 },
   name: { fontSize: 24, fontWeight: '700', flex: 1, marginRight: 12 },
-  address: { fontSize: 14, color: '#666', marginBottom: 12 },
+  address: { fontSize: 14, color: '#666', marginBottom: 4 },
+  cuisine: { fontSize: 14, color: '#FF6B35', fontWeight: '500', marginBottom: 12 },
   linksRow: { flexDirection: 'row', gap: 12, marginBottom: 20 },
   linkBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#f5f5f5', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
   linkText: { fontSize: 14, color: '#FF6B35', fontWeight: '500' },

@@ -59,7 +59,8 @@ export function useMunchedRestaurants(
       const { data: logs, error: logsErr } = await supabase
         .from('restaurant_logs')
         .select('*, restaurant:restaurants(*)')
-        .order('log_date', { ascending: false });
+        .order('log_date', { ascending: false })
+        .order('created_at', { ascending: false });
       if (logsErr) throw logsErr;
 
       // Group logs by restaurant_id
@@ -165,6 +166,7 @@ export function useEatListRestaurants(
         const dir = sortDirection === 'asc' ? 1 : -1;
         if (sortField === 'recency') return dir * (new Date(a.entry.date_added).getTime() - new Date(b.entry.date_added).getTime());
         if (sortField === 'distance' && a.distanceKm != null && b.distanceKm != null) return dir * (a.distanceKm - b.distanceKm);
+        // rating/vibe not applicable to eat-list entries
         return 0;
       });
 

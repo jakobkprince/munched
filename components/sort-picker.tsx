@@ -9,24 +9,15 @@ interface SortOption {
 interface Props {
   options: SortOption[];
   value: string;
-  direction: 'asc' | 'desc';
-  onChange: (value: string, direction: 'asc' | 'desc') => void;
+  onChange: (value: string) => void;
 }
 
-export function SortPicker({ options, value, direction, onChange }: Props) {
+export function SortPicker({ options, value, onChange }: Props) {
   const currentOption = options.find((o) => o.value === value);
-  const dirLabel = direction === 'desc' ? '↓' : '↑';
-  const buttonLabel = currentOption ? `${currentOption.label} ${dirLabel}` : 'Sort';
+  const buttonLabel = currentOption ? currentOption.label : 'Sort';
 
   function openSheet() {
-    // Build action sheet entries: each option gets both asc and desc
-    const actions: { label: string; value: string; direction: 'asc' | 'desc' }[] = [];
-    for (const opt of options) {
-      actions.push({ label: `${opt.label} ↓`, value: opt.value, direction: 'desc' });
-      actions.push({ label: `${opt.label} ↑`, value: opt.value, direction: 'asc' });
-    }
-
-    const titles = actions.map((a) => a.label);
+    const titles = options.map((o) => o.label);
 
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
@@ -36,21 +27,19 @@ export function SortPicker({ options, value, direction, onChange }: Props) {
           title: 'Sort By',
         },
         (buttonIndex) => {
-          if (buttonIndex < actions.length) {
-            const chosen = actions[buttonIndex];
-            onChange(chosen.value, chosen.direction);
+          if (buttonIndex < options.length) {
+            onChange(options[buttonIndex].value);
           }
         }
       );
     } else {
-      // Android fallback via Alert
       Alert.alert(
         'Sort By',
         undefined,
         [
-          ...actions.map((a) => ({
-            text: a.label,
-            onPress: () => onChange(a.value, a.direction),
+          ...options.map((o) => ({
+            text: o.label,
+            onPress: () => onChange(o.value),
           })),
           { text: 'Cancel', style: 'cancel' as const },
         ]

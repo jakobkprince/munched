@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import {
   View,
   TextInput,
@@ -7,14 +7,20 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
-import { PLACES_TYPE_TO_TAG } from '../constants/tags';
 import { useRestaurantActions } from '../hooks/use-restaurant-actions';
+import { useLocation } from '../hooks/use-location';
 
-interface Prediction {
-  place_id: string;
-  description: string;
+interface PlaceResult {
+  id: string;
+  name: string;
+  address: string | null;
+  lat: number | null;
+  lng: number | null;
+  website: string | null;
+  types: string[];
 }
 
 interface Props {
@@ -24,77 +30,70 @@ interface Props {
 
 export function RestaurantSearch({ onRestaurantSelected, placeholder = 'Search for a restaurant...' }: Props) {
   const [query, setQuery] = useState('');
-  const [predictions, setPredictions] = useState<Prediction[]>([]);
+  const [results, setResults] = useState<PlaceResult[]>([]);
   const [loading, setLoading] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const sessionToken = useRef(generateSessionToken());
   const { upsertRestaurant, autoSuggestTags } = useRestaurantActions();
+  const { location } = useLocation();
 
-  const search = useCallback((text: string) => {
-    setQuery(text);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
+  const runSearch = useCallback(async (text: string) => {
+    const trimmed = text.trim();
+    if (trimmed.length < 2) return;
 
-    if (text.trim().length < 2) {
-      setPredictions([]);
-      return;
-    }
-
-    debounceRef.current = setTimeout(async () => {
-      setLoading(true);
-      try {
-        const { data, error } = await supabase.functions.invoke('places-autocomplete', {
-          body: { query: text, sessiontoken: sessionToken.current },
-        });
-        if (error) throw error;
-        setPredictions(data.predictions ?? []);
-      } catch (e) {
-        console.error('Autocomplete error:', e);
-        setPredictions([]);
-      } finally {
-        setLoading(false);
-      }
-    }, 300);
-  }, []);
-
-  async function selectPlace(prediction: Prediction) {
     setLoading(true);
-    setPredictions([]);
+    setResults([]);
+    try {
+      const body: Record<string, unknown> = { textQuery: trimmed };
+      if (location) {
+        body.latitude = location.latitude;
+        body.longitude = location.longitude;
+      }
+      const { data, error } = await supabase.functions.invoke('places-text-search', { body });
+      if (error) throw error;
+      setResults(data.places ?? []);
+    } catch (e: unknown) {
+      let msg = 'Unknown error';
+      if (e && typeof e === 'object' && 'context' in e) {
+        try { msg = await (e as { context: Response }).context.text(); } catch { msg = String(e); }
+      } else if (e instanceof Error) {
+        msg = e.message;
+      }
+      Alert.alert('Search Error', msg);
+      setResults([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [location]);
+
+  async function selectPlace(place: PlaceResult) {
+    setLoading(true);
+    setResults([]);
     setQuery('');
 
     try {
-      const { data, error } = await supabase.functions.invoke('places-details', {
-        body: { place_id: prediction.place_id, sessiontoken: sessionToken.current },
-      });
-      if (error) throw error;
+      const appleMapsUrl = place.lat && place.lng
+        ? `https://maps.apple.com/?q=${encodeURIComponent(place.name)}&ll=${place.lat},${place.lng}`
+        : `https://maps.apple.com/?q=${encodeURIComponent(place.name)}`;
 
-      // Rotate session token after use
-      sessionToken.current = generateSessionToken();
-
-      const appleMapsUrl = data.lat && data.lng
-        ? `https://maps.apple.com/?q=${encodeURIComponent(data.name)}&ll=${data.lat},${data.lng}`
-        : `https://maps.apple.com/?q=${encodeURIComponent(data.name)}`;
-
-      const yelpUrl = `https://www.yelp.com/search?find_desc=${encodeURIComponent(data.name)}&find_loc=${encodeURIComponent(data.address ?? '')}`;
+      const yelpUrl = `https://www.yelp.com/search?find_desc=${encodeURIComponent(place.name)}&find_loc=${encodeURIComponent(place.address ?? '')}`;
 
       const restaurantId = await upsertRestaurant({
-        google_place_id: prediction.place_id,
-        name: data.name,
-        address: data.address ?? null,
-        lat: data.lat ?? null,
-        lng: data.lng ?? null,
-        website: data.website ?? null,
+        google_place_id: place.id,
+        name: place.name,
+        address: place.address,
+        lat: place.lat,
+        lng: place.lng,
+        website: place.website,
         apple_maps_url: appleMapsUrl,
         yelp_url: yelpUrl,
       });
 
-      // Auto-suggest tags from Google Places types
-      if (data.types && data.types.length > 0) {
-        await autoSuggestTags(restaurantId, data.types);
+      if (place.types.length > 0) {
+        await autoSuggestTags(restaurantId, place.types);
       }
 
       onRestaurantSelected(restaurantId);
     } catch (e) {
-      console.error('Place details error:', e);
+      console.error('Place select error:', e);
     } finally {
       setLoading(false);
     }
@@ -106,21 +105,33 @@ export function RestaurantSearch({ onRestaurantSelected, placeholder = 'Search f
         <TextInput
           style={styles.input}
           value={query}
-          onChangeText={search}
+          onChangeText={setQuery}
           placeholder={placeholder}
           autoFocus
           clearButtonMode="while-editing"
+          returnKeyType="search"
+          onSubmitEditing={() => runSearch(query)}
         />
-        {loading && <ActivityIndicator style={styles.spinner} color="#FF6B35" />}
+        <TouchableOpacity
+          style={[styles.searchBtn, loading && styles.searchBtnDisabled]}
+          onPress={() => runSearch(query)}
+          disabled={loading}
+        >
+          {loading
+            ? <ActivityIndicator color="#fff" size="small" />
+            : <Text style={styles.searchBtnText}>Search</Text>
+          }
+        </TouchableOpacity>
       </View>
 
       <FlatList
-        data={predictions}
-        keyExtractor={(item) => item.place_id}
+        data={results}
+        keyExtractor={(item) => item.id}
         keyboardShouldPersistTaps="handled"
         renderItem={({ item }) => (
           <TouchableOpacity style={styles.result} onPress={() => selectPlace(item)}>
-            <Text style={styles.resultText}>{item.description}</Text>
+            <Text style={styles.resultName}>{item.name}</Text>
+            {item.address && <Text style={styles.resultAddress}>{item.address}</Text>}
           </TouchableOpacity>
         )}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
@@ -129,13 +140,9 @@ export function RestaurantSearch({ onRestaurantSelected, placeholder = 'Search f
   );
 }
 
-function generateSessionToken(): string {
-  return Math.random().toString(36).substring(2) + Date.now().toString(36);
-}
-
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  inputRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8 },
+  inputRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, gap: 8 },
   input: {
     flex: 1,
     height: 44,
@@ -146,8 +153,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     backgroundColor: '#f5f5f5',
   },
-  spinner: { marginLeft: 8 },
-  result: { paddingHorizontal: 16, paddingVertical: 14 },
-  resultText: { fontSize: 15, color: '#1a1a1a' },
+  searchBtn: {
+    backgroundColor: '#FF6B35',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 72,
+  },
+  searchBtnDisabled: { opacity: 0.6 },
+  searchBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  result: { paddingHorizontal: 16, paddingVertical: 12 },
+  resultName: { fontSize: 15, fontWeight: '600', color: '#1a1a1a' },
+  resultAddress: { fontSize: 13, color: '#666', marginTop: 2 },
   separator: { height: 1, backgroundColor: '#eee', marginLeft: 16 },
 });

@@ -31,7 +31,7 @@ export function RestaurantCard({ item }: Props) {
   return (
     <TouchableOpacity
       style={styles.card}
-      onPress={() => router.push(`/restaurant/${restaurant.id}` as const)}
+      onPress={() => router.push(`/restaurant/${restaurant.id}?from=munched` as const)}
       activeOpacity={0.75}
     >
       {photoUrl ? (

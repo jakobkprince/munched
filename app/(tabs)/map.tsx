@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -127,35 +127,8 @@ export default function MapScreen() {
           ))}
       </MapView>
 
-      {/* Controls overlay */}
-      <View style={styles.overlay}>
-        {/* Toggle */}
-        <View style={styles.toggleRow}>
-          <TouchableOpacity
-            style={[styles.toggleBtn, viewMode === 'eat-list' && styles.toggleBtnActive]}
-            onPress={() => setViewMode('eat-list')}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.toggleText, viewMode === 'eat-list' && styles.toggleTextActive]}>
-              Eat-List
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.toggleBtn, viewMode === 'munched' && styles.toggleBtnActive]}
-            onPress={() => setViewMode('munched')}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.toggleText, viewMode === 'munched' && styles.toggleTextActive]}>
-              Munched
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Tag filter */}
-        <View style={styles.filterRow}>
-          <TagFilter selectedTags={tagFilter} onChange={setTagFilter} />
-        </View>
-
+      {/* Bottom controls */}
+      <View style={styles.bottomBar}>
         {/* Rating filter — Munched only */}
         {viewMode === 'munched' && (
           <ScrollView
@@ -186,6 +159,33 @@ export default function MapScreen() {
             ))}
           </ScrollView>
         )}
+
+        {/* Tag filter */}
+        <View style={styles.tagFilterRow}>
+          <TagFilter selectedTags={tagFilter} onChange={setTagFilter} />
+        </View>
+
+        {/* Toggle */}
+        <View style={styles.toggleRow}>
+          <TouchableOpacity
+            style={[styles.toggleBtn, viewMode === 'eat-list' && styles.toggleBtnActive]}
+            onPress={() => setViewMode('eat-list')}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.toggleText, viewMode === 'eat-list' && styles.toggleTextActive]}>
+              Eat-List
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.toggleBtn, viewMode === 'munched' && styles.toggleBtnActive]}
+            onPress={() => setViewMode('munched')}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.toggleText, viewMode === 'munched' && styles.toggleTextActive]}>
+              Munched
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -198,31 +198,35 @@ const styles = StyleSheet.create({
   map: {
     flex: 1,
   },
-  overlay: {
+  bottomBar: {
     position: 'absolute',
-    top: 0,
+    bottom: 0,
     left: 0,
     right: 0,
-    paddingTop: 60,
+    backgroundColor: '#fff',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#d0d0d0',
+    paddingTop: 10,
+    paddingBottom: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: -3 },
+    elevation: 10,
   },
   toggleRow: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
+    backgroundColor: '#f0f0f0',
     borderRadius: 10,
     marginHorizontal: 16,
-    marginBottom: 8,
+    marginTop: 8,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 4,
   },
   toggleBtn: {
     flex: 1,
     paddingVertical: 10,
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: '#f0f0f0',
   },
   toggleBtnActive: {
     backgroundColor: BRAND_COLOR,
@@ -235,17 +239,8 @@ const styles = StyleSheet.create({
   toggleTextActive: {
     color: '#fff',
   },
-  filterRow: {
-    backgroundColor: 'rgba(255,255,255,0.92)',
-    borderRadius: 10,
-    marginHorizontal: 16,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
-    overflow: 'hidden',
+  tagFilterRow: {
+    marginHorizontal: 0,
   },
   ratingFilterScroll: {
     flexShrink: 0,
@@ -255,21 +250,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     paddingHorizontal: 4,
-    paddingVertical: 6,
+    paddingVertical: 4,
     alignItems: 'center',
   },
   ratingChip: {
-    backgroundColor: 'rgba(255,255,255,0.92)',
+    backgroundColor: '#f0f0f0',
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderWidth: 1,
-    borderColor: '#ddd',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    borderColor: '#e0e0e0',
   },
   ratingChipActive: {
     backgroundColor: BRAND_COLOR,

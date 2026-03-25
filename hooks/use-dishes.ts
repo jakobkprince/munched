@@ -41,7 +41,8 @@ export function useMunchedDishes(
       const { data: logs, error: err } = await supabase
         .from('dish_logs')
         .select('*, dish:dishes(*, restaurant:restaurants(*))')
-        .order('log_date', { ascending: false });
+        .order('log_date', { ascending: false })
+        .order('created_at', { ascending: false });
       if (err) throw err;
 
       const byDish = new Map<string, { dish: Dish; restaurant: Restaurant; logs: DishLog[] }>();
@@ -145,6 +146,7 @@ export function useEatListDishes(
           const dB = getDistanceKm(userLocation, { latitude: b.restaurant.lat, longitude: b.restaurant.lng! });
           return dir * (dA - dB);
         }
+        // rating/vibe not applicable to eat-list entries
         return 0;
       });
 

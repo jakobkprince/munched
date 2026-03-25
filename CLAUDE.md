@@ -8,7 +8,7 @@ A mobile app for logging/rating restaurants and dishes (Munched) and maintaining
 
 - **Frontend**: Expo + React Native with TypeScript
 - **Backend**: Supabase (Postgres, Auth, Storage, Edge Functions)
-- **External APIs**: Google Places API
+- **External APIs**: Google Places API (New) — Text Search endpoint
 
 ## Environment Variables
 
@@ -37,7 +37,10 @@ Never hardcode keys in source files. Use `.env` and ensure it is in `.gitignore`
 ├── constants/              # Tags list, enums, config values
 ├── supabase/
 │   ├── migrations/         # SQL migration files for schema
-│   └── functions/          # Supabase Edge Functions (Google Places)
+│   │   └── functions/          # Supabase Edge Functions (Google Places)
+│       ├── places-text-search/   # Places Text Search (New) — main search (deploy with --no-verify-jwt)
+│       ├── places-autocomplete/  # Legacy — no longer used
+│       └── places-details/       # Legacy — no longer used
 └── assets/                 # Static assets (icons, images)
 ```
 
@@ -56,7 +59,8 @@ Never hardcode keys in source files. Use `.env` and ensure it is in `.gitignore`
 
 - Supabase client is initialized once in `lib/supabase.ts` and imported everywhere
 - Photos are uploaded to Supabase Storage and their public URLs are stored in the database
-- Restaurant data is populated from Google Places API — never manually entered
+- Restaurant data is populated from Google Places API (New) Text Search — never manually entered
+- The `places-text-search` edge function returns all needed restaurant data in one call (name, address, coords, website, types) — no separate details call needed
 - Dishes are always associated with a restaurant — no orphaned dishes
 
 ## When In Doubt

@@ -14,7 +14,7 @@ export function DishCard({ item }: Props) {
   return (
     <TouchableOpacity
       style={styles.card}
-      onPress={() => router.push(`/dish/${dish.id}` as const)}
+      onPress={() => router.push(`/dish/${dish.id}?from=munched` as const)}
       activeOpacity={0.75}
     >
       <View style={styles.info}>
@@ -22,7 +22,7 @@ export function DishCard({ item }: Props) {
         <TouchableOpacity
           onPress={(e) => {
             e.stopPropagation();
-            router.push(`/restaurant/${restaurant.id}` as const);
+            router.push(`/restaurant/${restaurant.id}?from=munched` as const);
           }}
           hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
         >

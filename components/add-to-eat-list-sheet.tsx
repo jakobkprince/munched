@@ -1,22 +1,28 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity,
+  View, Text, TouchableOpacity,
   StyleSheet, Modal, KeyboardAvoidingView, Platform,
 } from 'react-native';
+import { BulletTextInput } from './bullet-text-input';
 
 interface Props {
   visible: boolean;
+  initialNotes?: string;
+  title?: string;
   onConfirm: (notes: string) => void;
   onClose: () => void;
   loading?: boolean;
 }
 
-export function AddToEatListSheet({ visible, onConfirm, onClose, loading }: Props) {
-  const [notes, setNotes] = useState('');
+export function AddToEatListSheet({ visible, initialNotes = '', title = 'Add to Eat-List', onConfirm, onClose, loading }: Props) {
+  const [notes, setNotes] = useState(initialNotes);
+
+  useEffect(() => {
+    if (visible) setNotes(initialNotes);
+  }, [visible]);
 
   function handleConfirm() {
     onConfirm(notes);
-    setNotes('');
   }
 
   return (
@@ -24,14 +30,14 @@ export function AddToEatListSheet({ visible, onConfirm, onClose, loading }: Prop
       <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose}><Text style={styles.cancel}>Cancel</Text></TouchableOpacity>
-          <Text style={styles.title}>Add to Eat-List</Text>
+          <Text style={styles.title}>{title}</Text>
           <TouchableOpacity onPress={handleConfirm} disabled={loading}>
             <Text style={[styles.save, loading && styles.disabled]}>Save</Text>
           </TouchableOpacity>
         </View>
         <View style={styles.body}>
           <Text style={styles.label}>Notes (optional)</Text>
-          <TextInput
+          <BulletTextInput
             style={styles.input}
             value={notes}
             onChangeText={setNotes}

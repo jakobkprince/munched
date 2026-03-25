@@ -24,7 +24,7 @@ App for logging/rating restaurants and specific dishes you've tried (**Munched**
 
 ### External APIs (called via Supabase Edge Functions)
 
-- **Google Places API**: Autocomplete + Place Details for restaurant search and auto-population
+- **Google Places API (New)**: Text Search for restaurant search and auto-population (no autocomplete — user types a query and taps Search). Edge function deployed with `--no-verify-jwt`.
 - **Yelp**: no API — link constructed client-side as a search URL (`https://www.yelp.com/search?find_desc=Restaurant+Name&find_loc=Address`)
 
 ### Key Dependencies
@@ -40,7 +40,7 @@ App for logging/rating restaurants and specific dishes you've tried (**Munched**
 
 ### Restaurants
 
-- Added via **search** (not manual entry) — user types a restaurant name and selects from autocomplete results
+- Added via **search** (not manual entry) — user types a restaurant name, taps Search, and selects from the results list
 - Populated automatically with: name, address, coordinates, website, Yelp link, Apple Maps link
 - Can be tagged with one or more cuisine/category tags
 - Rated 1–5 stars (overall) + 1–5 stars (vibe)
@@ -59,12 +59,13 @@ App for logging/rating restaurants and specific dishes you've tried (**Munched**
 
 ### Restaurant Search & Auto-Population
 
-- **Google Places API** powers autocomplete as the user types a restaurant name (debounced 300–500ms)
-- On selection, **Place Details** fetches: name, address, coordinates, website
+- **Google Places Text Search (New) API** (`places:searchText`) powers restaurant search
+- User types a name and taps **Search** (or presses Return) — no live autocomplete
+- If location permission is granted, current location is sent as a `locationBias` to rank nearby restaurants higher
+- A single Text Search call returns all needed data: name, address, coordinates, website, and types — no separate Place Details call required
 - **Apple Maps link** constructed from coordinates/address (`https://maps.apple.com/?q=...`)
 - **Yelp link** constructed client-side as a search URL (`https://www.yelp.com/search?find_desc=Restaurant+Name&find_loc=Address`) — no API required
 - Google Places category data used to **auto-suggest relevant tags** on the restaurant
-- Results cached where possible to minimize API calls
 
 ### Tags (Cuisine/Category)
 

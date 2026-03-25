@@ -10,6 +10,7 @@ import { useTags } from '../../hooks/use-tags';
 import { usePhotos } from '../../hooks/use-photos';
 import { StarRating } from '../../components/star-rating';
 import { AddToMunchedSheet } from '../../components/add-to-munched-sheet';
+import { AddToEatListSheet } from '../../components/add-to-eat-list-sheet';
 import { TagPickerSheet } from '../../components/tag-picker-sheet';
 import { PreviousMunchesSheet } from '../../components/previous-munches-sheet';
 import { supabase } from '../../lib/supabase';
@@ -22,7 +23,7 @@ interface DishStatus {
 }
 
 export default function DishPage() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
   const actions = useDishActions();
   const tagActions = useTags();
   const { getPublicUrl } = usePhotos();
@@ -36,8 +37,10 @@ export default function DishPage() {
   const [loading, setLoading] = useState(true);
 
   const [munchedSheet, setMunchedSheet] = useState(false);
+  const [eatListSheet, setEatListSheet] = useState(false);
   const [tagSheet, setTagSheet] = useState(false);
   const [prevMunchesSheet, setPrevMunchesSheet] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
   const loadDish = useCallback(async () => {
@@ -46,7 +49,7 @@ export default function DishPage() {
       const [dishRes, eatListRes, logsRes, tagsRes] = await Promise.all([
         supabase.from('dishes').select('*, restaurant:restaurants(*)').eq('id', id).single(),
         supabase.from('eat_list_dishes').select('*, dish:dishes(*, restaurant:restaurants(*))').eq('dish_id', id).maybeSingle(),
-        supabase.from('dish_logs').select('*').eq('dish_id', id).order('log_date', { ascending: false }),
+        supabase.from('dish_logs').select('*').eq('dish_id', id).order('log_date', { ascending: false }).order('created_at', { ascending: false }),
         supabase.from('dish_tags').select('tag').eq('dish_id', id),
       ]);
       if (dishRes.error) throw dishRes.error;
@@ -165,8 +168,49 @@ export default function DishPage() {
     }
   }
 
+  async function handleEditMunched(data: { rating: number; vibe_rating?: number; notes: string; log_date: string; photoUris: string[] }) {
+    if (!latestLog) return;
+    setActionLoading(true);
+    try {
+      await actions.editDishLog(latestLog.id, {
+        rating: data.rating,
+        notes: data.notes,
+        log_date: data.log_date,
+      });
+      await loadDish();
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : 'Failed to edit');
+    } finally {
+      setActionLoading(false);
+      setMunchedSheet(false);
+      setIsEditMode(false);
+    }
+  }
+
+  async function handleEditEatList(notes: string) {
+    if (!status.eatListEntry) return;
+    setActionLoading(true);
+    try {
+      await actions.editEatListEntry(status.eatListEntry.id, notes);
+      await loadDish();
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : 'Failed to edit');
+    } finally {
+      setActionLoading(false);
+      setEatListSheet(false);
+      setIsEditMode(false);
+    }
+  }
+
   async function handleMenuAction(action: string) {
-    if (action === 'Delete') {
+    if (action === 'Edit') {
+      setIsEditMode(true);
+      if (status.inMunched) {
+        setMunchedSheet(true);
+      } else {
+        setEatListSheet(true);
+      }
+    } else if (action === 'Delete') {
       const listName = status.inMunched ? 'Munched' : 'Eat-List';
       Alert.alert('Delete', `Remove this dish from ${listName}?`, [
         { text: 'Cancel', style: 'cancel' },
@@ -191,6 +235,14 @@ export default function DishPage() {
   }
 
   return (
+    <View style={styles.page}>
+      {from && (
+        <View style={styles.contextBanner}>
+          <Text style={styles.contextBannerText}>
+            {from === 'munched' ? 'Munched' : 'Eat-List'}
+          </Text>
+        </View>
+      )}
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Header */}
       <View style={styles.headerRow}>
@@ -203,7 +255,7 @@ export default function DishPage() {
       </View>
 
       {/* Restaurant link */}
-      <TouchableOpacity onPress={() => router.push(`/restaurant/${restaurant.id}`)} style={styles.restaurantLink}>
+      <TouchableOpacity onPress={() => router.push(`/restaurant/${restaurant.id}${from ? `?from=${from}` : ''}`)} style={styles.restaurantLink}>
         <Ionicons name="restaurant-outline" size={14} color="#FF6B35" />
         <Text style={styles.restaurantName}>{restaurant.name}</Text>
         <Ionicons name="chevron-forward" size={14} color="#FF6B35" />
@@ -305,14 +357,23 @@ export default function DishPage() {
       </View>
 
       {/* Sheets */}
+      <AddToEatListSheet
+        visible={eatListSheet}
+        initialNotes={isEditMode ? (status.eatListEntry?.notes ?? '') : ''}
+        title={isEditMode ? 'Edit Eat-List Entry' : 'Add to Eat-List'}
+        onConfirm={handleEditEatList}
+        onClose={() => { setEatListSheet(false); setIsEditMode(false); }}
+        loading={actionLoading}
+      />
       <AddToMunchedSheet
         visible={munchedSheet}
         showVibeRating={false}
-        initialNotes={status.eatListEntry?.notes ?? ''}
-        onConfirm={status.inMunched ? handleReMunch : handleAddToMunched}
-        onClose={() => setMunchedSheet(false)}
+        initialRating={isEditMode ? (latestLog?.rating ?? 0) : 0}
+        initialNotes={isEditMode ? (latestLog?.notes ?? '') : (status.eatListEntry?.notes ?? '')}
+        onConfirm={isEditMode ? handleEditMunched : (status.inMunched ? handleReMunch : handleAddToMunched)}
+        onClose={() => { setMunchedSheet(false); setIsEditMode(false); }}
         loading={actionLoading}
-        title={status.inMunched ? 'Re-Munch' : 'Log to Munched'}
+        title={isEditMode ? 'Edit Munch' : (status.inMunched ? 'Re-Munch' : 'Log to Munched')}
       />
       <TagPickerSheet
         visible={tagSheet}
@@ -323,9 +384,11 @@ export default function DishPage() {
       <PreviousMunchesSheet
         visible={prevMunchesSheet}
         logs={allLogs}
+        photos={allPhotos}
         onClose={() => setPrevMunchesSheet(false)}
       />
     </ScrollView>
+    </View>
   );
 }
 
@@ -334,6 +397,9 @@ function formatDate(dateStr: string): string {
 }
 
 const styles = StyleSheet.create({
+  page: { flex: 1, backgroundColor: '#fff' },
+  contextBanner: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 8, backgroundColor: '#fff8f5', borderBottomWidth: 1, borderBottomColor: '#ffe0d0' },
+  contextBannerText: { fontSize: 13, fontWeight: '700', color: '#FF6B35', textTransform: 'uppercase', letterSpacing: 0.5 },
   container: { flex: 1, backgroundColor: '#fff' },
   content: { padding: 20, paddingBottom: 40 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },

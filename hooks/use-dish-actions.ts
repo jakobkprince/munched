@@ -51,9 +51,11 @@ export function useDishActions() {
       for (const uri of log.photoUris) {
         const filename = `dish_log/${newLog.id}/${Date.now()}.jpg`;
         const response = await fetch(uri);
-        const blob = await response.blob();
-        await supabase.storage.from('photos').upload(filename, blob, { contentType: 'image/jpeg' });
-        await supabase.from('photos').insert({ storage_path: filename, log_type: 'dish_log', log_id: newLog.id });
+        const arrayBuffer = await response.arrayBuffer();
+        const { error: uploadError } = await supabase.storage.from('photos').upload(filename, arrayBuffer, { contentType: 'image/jpeg' });
+        if (uploadError) throw uploadError;
+        const { error: insertError } = await supabase.from('photos').insert({ storage_path: filename, log_type: 'dish_log', log_id: newLog.id });
+        if (insertError) throw insertError;
       }
     }
 
@@ -75,9 +77,11 @@ export function useDishActions() {
       for (const uri of log.photoUris) {
         const filename = `dish_log/${newLog.id}/${Date.now()}.jpg`;
         const response = await fetch(uri);
-        const blob = await response.blob();
-        await supabase.storage.from('photos').upload(filename, blob, { contentType: 'image/jpeg' });
-        await supabase.from('photos').insert({ storage_path: filename, log_type: 'dish_log', log_id: newLog.id });
+        const arrayBuffer = await response.arrayBuffer();
+        const { error: uploadError } = await supabase.storage.from('photos').upload(filename, arrayBuffer, { contentType: 'image/jpeg' });
+        if (uploadError) throw uploadError;
+        const { error: insertError } = await supabase.from('photos').insert({ storage_path: filename, log_type: 'dish_log', log_id: newLog.id });
+        if (insertError) throw insertError;
       }
     }
   }

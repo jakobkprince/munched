@@ -164,8 +164,8 @@ async function uploadPhotos(uris: string[], logType: 'restaurant_log' | 'dish_lo
   for (const uri of uris) {
     const filename = `${logType}/${logId}/${Date.now()}.jpg`;
     const response = await fetch(uri);
-    const blob = await response.blob();
-    const { error: uploadError } = await supabase.storage.from('photos').upload(filename, blob, { contentType: 'image/jpeg' });
+    const arrayBuffer = await response.arrayBuffer();
+    const { error: uploadError } = await supabase.storage.from('photos').upload(filename, arrayBuffer, { contentType: 'image/jpeg' });
     if (uploadError) throw uploadError;
     const { error: insertError } = await supabase
       .from('photos')
