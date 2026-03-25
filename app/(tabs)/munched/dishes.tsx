@@ -39,7 +39,7 @@ export default function MunchedDishes() {
   const [search, setSearch] = useState('');
 
   const { location } = useLocation();
-  const { data, loading, error, refresh } = useMunchedDishes(sortField, sortDirection, tagFilter, location);
+  const { data, tagCounts, loading, error, refresh } = useMunchedDishes(sortField, sortDirection, tagFilter, location);
 
   useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
 
@@ -138,7 +138,7 @@ export default function MunchedDishes() {
             />
           </TouchableOpacity>
         </View>
-        <TagFilter selectedTags={tagFilter} onChange={setTagFilter} />
+        <TagFilter selectedTags={tagFilter} onChange={setTagFilter} tagCounts={tagCounts} />
       </View>
     </KeyboardAvoidingView>
   );

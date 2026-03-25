@@ -4,6 +4,7 @@ import {
   Alert, Image, ActionSheetIOS, Platform,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useDishActions } from '../../hooks/use-dish-actions';
 import { useTags } from '../../hooks/use-tags';
@@ -23,6 +24,7 @@ interface DishStatus {
 }
 
 export default function DishPage() {
+  const insets = useSafeAreaInsets();
   const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
   const actions = useDishActions();
   const tagActions = useTags();
@@ -235,7 +237,7 @@ export default function DishPage() {
   }
 
   return (
-    <View style={styles.page}>
+    <View style={[styles.page, { paddingTop: insets.top }]}>
       {from && (
         <View style={styles.contextBanner}>
           <Text style={styles.contextBannerText}>
@@ -388,6 +390,11 @@ export default function DishPage() {
         onClose={() => setPrevMunchesSheet(false)}
       />
     </ScrollView>
+
+      {/* Floating back button */}
+      <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.8}>
+        <Ionicons name="chevron-back" size={26} color="#fff" />
+      </TouchableOpacity>
     </View>
   );
 }
@@ -398,10 +405,26 @@ function formatDate(dateStr: string): string {
 
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: '#fff' },
+  backBtn: {
+    position: 'absolute',
+    bottom: 40,
+    left: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FF6B35',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
+  },
   contextBanner: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 8, backgroundColor: '#fff8f5', borderBottomWidth: 1, borderBottomColor: '#ffe0d0' },
   contextBannerText: { fontSize: 13, fontWeight: '700', color: '#FF6B35', textTransform: 'uppercase', letterSpacing: 0.5 },
   container: { flex: 1, backgroundColor: '#fff' },
-  content: { padding: 20, paddingBottom: 40 },
+  content: { padding: 20, paddingBottom: 110 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
   name: { fontSize: 24, fontWeight: '700', flex: 1, marginRight: 12 },

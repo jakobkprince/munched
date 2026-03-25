@@ -17,12 +17,12 @@ export const TAG_GROUPS: TagGroup[] = [
     tags: ['Italian', 'Pizza', 'French', 'Spanish/Tapas'],
   },
   {
-    label: 'Mediterranean',
-    tags: ['Mediterranean'],
+    label: 'Eastern Mediterranean',
+    tags: ['Mediterranean', 'Middle Eastern', 'Lebanese'],
   },
   {
-    label: 'African & Middle Eastern',
-    tags: ['Middle Eastern', 'Lebanese', 'Ethiopian', 'Moroccan'],
+    label: 'African',
+    tags: ['Ethiopian', 'Moroccan'],
   },
   {
     label: 'American',

@@ -31,6 +31,7 @@ export function useMunchedDishes(
   userLocation: Coordinates | null
 ) {
   const [data, setData] = useState<MunchedDish[]>([]);
+  const [tagCounts, setTagCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,7 +57,7 @@ export function useMunchedDishes(
       }
 
       const dishIds = Array.from(byDish.keys());
-      if (dishIds.length === 0) { setData([]); return; }
+      if (dishIds.length === 0) { setData([]); setTagCounts({}); return; }
 
       const [photosRes, tagsRes] = await Promise.all([
         supabase.from('photos').select('*').eq('log_type', 'dish_log').in('log_id', logs?.map(l => l.id) ?? []),
@@ -71,6 +72,15 @@ export function useMunchedDishes(
         photos: (photosRes.data ?? []).filter((p) => logs.some((l) => l.id === p.log_id)),
         tags: (tagsRes.data ?? []).filter((t) => t.dish_id === dish.id).map((t) => t.tag),
       }));
+
+      // Compute tag counts before filtering
+      const counts: Record<string, number> = {};
+      for (const item of result) {
+        for (const tag of item.tags) {
+          counts[tag] = (counts[tag] ?? 0) + 1;
+        }
+      }
+      setTagCounts(counts);
 
       if (tagFilter.length > 0) {
         result = result.filter((r) => tagFilter.every((t) => r.tags.includes(t)));
@@ -99,7 +109,7 @@ export function useMunchedDishes(
   }, [sortField, sortDirection, tagFilter, userLocation]);
 
   useEffect(() => { fetch(); }, [fetch]);
-  return { data, loading, error, refresh: fetch };
+  return { data, tagCounts, loading, error, refresh: fetch };
 }
 
 export function useEatListDishes(
@@ -109,6 +119,7 @@ export function useEatListDishes(
   userLocation: Coordinates | null
 ) {
   const [data, setData] = useState<EatListDishView[]>([]);
+  const [tagCounts, setTagCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -133,6 +144,15 @@ export function useEatListDishes(
         restaurant: entry.dish.restaurant,
         tags: (tagsRes.data ?? []).filter((t) => t.dish_id === entry.dish_id).map((t) => t.tag),
       }));
+
+      // Compute tag counts before filtering
+      const counts: Record<string, number> = {};
+      for (const item of result) {
+        for (const tag of item.tags) {
+          counts[tag] = (counts[tag] ?? 0) + 1;
+        }
+      }
+      setTagCounts(counts);
 
       if (tagFilter.length > 0) {
         result = result.filter((r) => tagFilter.every((t) => r.tags.includes(t)));
@@ -159,5 +179,5 @@ export function useEatListDishes(
   }, [sortField, sortDirection, tagFilter, userLocation]);
 
   useEffect(() => { fetch(); }, [fetch]);
-  return { data, loading, error, refresh: fetch };
+  return { data, tagCounts, loading, error, refresh: fetch };
 }

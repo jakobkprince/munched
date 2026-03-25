@@ -9,19 +9,31 @@ interface Props {
 }
 
 export function StarRating({ value, onChange, size = 24, color = '#FF6B35' }: Props) {
+  function handlePress(star: number) {
+    if (!onChange) return;
+    // Tapping the same whole-number star steps it down to a half star
+    onChange(value === star ? star - 0.5 : star);
+  }
+
+  function iconName(star: number): 'star' | 'star-half' | 'star-outline' {
+    if (value >= star) return 'star';
+    if (value >= star - 0.5) return 'star-half';
+    return 'star-outline';
+  }
+
   return (
     <View style={styles.row}>
       {[1, 2, 3, 4, 5].map((star) => (
         <TouchableOpacity
           key={star}
-          onPress={() => onChange?.(star)}
+          onPress={() => handlePress(star)}
           disabled={!onChange}
           hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
         >
           <Ionicons
-            name={star <= value ? 'star' : 'star-outline'}
+            name={iconName(star)}
             size={size}
-            color={star <= value ? color : '#ccc'}
+            color={value >= star - 0.5 ? color : '#ccc'}
           />
         </TouchableOpacity>
       ))}

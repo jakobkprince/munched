@@ -49,6 +49,7 @@ export function useMunchedRestaurants(
   userLocation: Coordinates | null
 ) {
   const [data, setData] = useState<MunchedRestaurant[]>([]);
+  const [tagCounts, setTagCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -75,7 +76,7 @@ export function useMunchedRestaurants(
       }
 
       const restaurantIds = Array.from(byRestaurant.keys());
-      if (restaurantIds.length === 0) { setData([]); return; }
+      if (restaurantIds.length === 0) { setData([]); setTagCounts({}); return; }
 
       const [photosRes, tagsRes] = await Promise.all([
         supabase.from('photos').select('*').eq('log_type', 'restaurant_log').in('log_id', logs?.map(l => l.id) ?? []),
@@ -89,6 +90,15 @@ export function useMunchedRestaurants(
         photos: (photosRes.data ?? []).filter((p) => logs.some((l) => l.id === p.log_id)),
         tags: (tagsRes.data ?? []).filter((t) => t.restaurant_id === restaurant.id).map((t) => t.tag),
       }));
+
+      // Compute tag counts before filtering
+      const counts: Record<string, number> = {};
+      for (const item of result) {
+        for (const tag of item.tags) {
+          counts[tag] = (counts[tag] ?? 0) + 1;
+        }
+      }
+      setTagCounts(counts);
 
       // Filter by tags
       if (tagFilter.length > 0) {
@@ -121,7 +131,7 @@ export function useMunchedRestaurants(
 
   useEffect(() => { fetch(); }, [fetch]);
 
-  return { data, loading, error, refresh: fetch };
+  return { data, tagCounts, loading, error, refresh: fetch };
 }
 
 export function useEatListRestaurants(
@@ -131,6 +141,7 @@ export function useEatListRestaurants(
   userLocation: Coordinates | null
 ) {
   const [data, setData] = useState<EatListRestaurantView[]>([]);
+  const [tagCounts, setTagCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -158,6 +169,15 @@ export function useEatListRestaurants(
           : undefined,
       }));
 
+      // Compute tag counts before filtering
+      const counts: Record<string, number> = {};
+      for (const item of result) {
+        for (const tag of item.tags) {
+          counts[tag] = (counts[tag] ?? 0) + 1;
+        }
+      }
+      setTagCounts(counts);
+
       if (tagFilter.length > 0) {
         result = result.filter((r) => tagFilter.every((t) => r.tags.includes(t)));
       }
@@ -180,5 +200,5 @@ export function useEatListRestaurants(
 
   useEffect(() => { fetch(); }, [fetch]);
 
-  return { data, loading, error, refresh: fetch };
+  return { data, tagCounts, loading, error, refresh: fetch };
 }

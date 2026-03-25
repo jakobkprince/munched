@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,16 +8,20 @@ import {
   TextInput,
   StyleSheet,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TAG_GROUPS } from '../constants/tags';
 
 interface Props {
   selectedTags: string[];
   onChange: (tags: string[]) => void;
+  tagCounts?: Record<string, number>;
 }
 
-export function TagFilter({ selectedTags, onChange }: Props) {
+export function TagFilter({ selectedTags, onChange, tagCounts }: Props) {
   const [modalVisible, setModalVisible] = useState(false);
   const [search, setSearch] = useState('');
+  const [sortMode, setSortMode] = useState<'category' | 'quantity'>('category');
+  const insets = useSafeAreaInsets();
 
   function toggleTag(tag: string) {
     if (selectedTags.includes(tag)) {
@@ -31,6 +35,20 @@ export function TagFilter({ selectedTags, onChange }: Props) {
     ...group,
     tags: group.tags.filter((t) => t.toLowerCase().includes(search.toLowerCase())),
   })).filter((g) => g.tags.length > 0);
+
+  const quantityTags = useMemo(() => {
+    if (!tagCounts) return [];
+    return Object.entries(tagCounts)
+      .filter(([, count]) => count > 0)
+      .sort((a, b) => b[1] - a[1])
+      .map(([tag, count]) => ({ tag, count }));
+  }, [tagCounts]);
+
+  const filteredQuantityTags = useMemo(() => {
+    if (!search.trim()) return quantityTags;
+    const q = search.toLowerCase();
+    return quantityTags.filter(({ tag }) => tag.toLowerCase().includes(q));
+  }, [quantityTags, search]);
 
   return (
     <>
@@ -82,29 +100,69 @@ export function TagFilter({ selectedTags, onChange }: Props) {
           />
 
           <ScrollView keyboardShouldPersistTaps="handled">
-            {filteredGroups.map((group) => (
-              <View key={group.label}>
-                <Text style={styles.groupLabel}>{group.label}</Text>
-                <View style={styles.tagRow}>
-                  {group.tags.map((tag) => {
-                    const selected = selectedTags.includes(tag);
-                    return (
-                      <TouchableOpacity
-                        key={tag}
-                        style={[styles.tagChip, selected && styles.tagChipSelected]}
-                        onPress={() => toggleTag(tag)}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={[styles.tagChipText, selected && styles.tagChipTextSelected]}>
-                          {tag}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
+            {sortMode === 'category' ? (
+              filteredGroups.map((group) => (
+                <View key={group.label}>
+                  <Text style={styles.groupLabel}>{group.label}</Text>
+                  <View style={styles.tagRow}>
+                    {group.tags.map((tag) => {
+                      const selected = selectedTags.includes(tag);
+                      return (
+                        <TouchableOpacity
+                          key={tag}
+                          style={[styles.tagChip, selected && styles.tagChipSelected]}
+                          onPress={() => toggleTag(tag)}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[styles.tagChipText, selected && styles.tagChipTextSelected]}>
+                            {tag}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
                 </View>
+              ))
+            ) : (
+              <View style={[styles.tagRow, styles.quantityTagRow]}>
+                {filteredQuantityTags.map(({ tag, count }) => {
+                  const selected = selectedTags.includes(tag);
+                  return (
+                    <TouchableOpacity
+                      key={tag}
+                      style={[styles.tagChip, styles.tagChipQuantity, selected && styles.tagChipSelected]}
+                      onPress={() => toggleTag(tag)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.tagChipText, selected && styles.tagChipTextSelected]}>
+                        {tag}
+                      </Text>
+                      <View style={[styles.countBadge, selected && styles.countBadgeSelected]}>
+                        <Text style={[styles.countBadgeText, selected && styles.countBadgeTextSelected]}>
+                          {count}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+                {filteredQuantityTags.length === 0 && (
+                  <Text style={styles.emptyText}>No tags found.</Text>
+                )}
               </View>
-            ))}
+            )}
           </ScrollView>
+
+          <View style={[styles.modalFooter, { paddingBottom: insets.bottom + 12 }]}>
+            <TouchableOpacity
+              style={styles.sortModeBtn}
+              onPress={() => setSortMode((m) => (m === 'category' ? 'quantity' : 'category'))}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.sortModeBtnText}>
+                {sortMode === 'category' ? 'Quantity' : 'Category'}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
     </>
@@ -192,11 +250,19 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingBottom: 8,
   },
+  quantityTagRow: {
+    paddingTop: 12,
+  },
   tagChip: {
     backgroundColor: '#f0f0f0',
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 8,
+  },
+  tagChipQuantity: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   tagChipSelected: {
     backgroundColor: '#FF6B35',
@@ -208,5 +274,49 @@ const styles = StyleSheet.create({
   tagChipTextSelected: {
     color: '#fff',
     fontWeight: '500',
+  },
+  countBadge: {
+    backgroundColor: 'rgba(0,0,0,0.12)',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    minWidth: 20,
+    alignItems: 'center',
+  },
+  countBadgeSelected: {
+    backgroundColor: 'rgba(255,255,255,0.3)',
+  },
+  countBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#333',
+  },
+  countBadgeTextSelected: {
+    color: '#fff',
+  },
+  emptyText: {
+    color: '#aaa',
+    fontSize: 14,
+    paddingHorizontal: 4,
+    paddingTop: 4,
+  },
+  // Footer
+  modalFooter: {
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    paddingTop: 12,
+    paddingHorizontal: 12,
+    alignItems: 'flex-end',
+  },
+  sortModeBtn: {
+    backgroundColor: '#FF6B35',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  sortModeBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

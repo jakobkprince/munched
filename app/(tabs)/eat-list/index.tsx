@@ -106,7 +106,7 @@ export default function EatListRestaurants() {
   const [search, setSearch] = useState('');
 
   const { location } = useLocation();
-  const { data, loading, error, refresh } = useEatListRestaurants(sortField, sortDirection, tagFilter, location);
+  const { data, tagCounts, loading, error, refresh } = useEatListRestaurants(sortField, sortDirection, tagFilter, location);
 
   useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
 
@@ -205,7 +205,7 @@ export default function EatListRestaurants() {
             />
           </TouchableOpacity>
         </View>
-        <TagFilter selectedTags={tagFilter} onChange={setTagFilter} />
+        <TagFilter selectedTags={tagFilter} onChange={setTagFilter} tagCounts={tagCounts} />
       </View>
     </KeyboardAvoidingView>
   );

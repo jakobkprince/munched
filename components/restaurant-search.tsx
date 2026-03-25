@@ -8,6 +8,10 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { useRestaurantActions } from '../hooks/use-restaurant-actions';
@@ -32,6 +36,10 @@ export function RestaurantSearch({ onRestaurantSelected, placeholder = 'Search f
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<PlaceResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [manualVisible, setManualVisible] = useState(false);
+  const [manualName, setManualName] = useState('');
+  const [manualAddress, setManualAddress] = useState('');
   const { upsertRestaurant, autoSuggestTags } = useRestaurantActions();
   const { location } = useLocation();
 
@@ -50,6 +58,7 @@ export function RestaurantSearch({ onRestaurantSelected, placeholder = 'Search f
       const { data, error } = await supabase.functions.invoke('places-text-search', { body });
       if (error) throw error;
       setResults(data.places ?? []);
+      setHasSearched(true);
     } catch (e: unknown) {
       let msg = 'Unknown error';
       if (e && typeof e === 'object' && 'context' in e) {
@@ -59,10 +68,49 @@ export function RestaurantSearch({ onRestaurantSelected, placeholder = 'Search f
       }
       Alert.alert('Search Error', msg);
       setResults([]);
+      setHasSearched(true);
     } finally {
       setLoading(false);
     }
   }, [location]);
+
+  async function addManually() {
+    const name = manualName.trim();
+    if (!name) {
+      Alert.alert('Name required', 'Please enter a restaurant name.');
+      return;
+    }
+    setLoading(true);
+    setManualVisible(false);
+    try {
+      const placeId = `manual_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      const address = manualAddress.trim() || null;
+      const appleMapsUrl = address
+        ? `https://maps.apple.com/?q=${encodeURIComponent(name)}&address=${encodeURIComponent(address)}`
+        : `https://maps.apple.com/?q=${encodeURIComponent(name)}`;
+      const yelpUrl = `https://www.yelp.com/search?find_desc=${encodeURIComponent(name)}&find_loc=${encodeURIComponent(address ?? '')}`;
+
+      const restaurantId = await upsertRestaurant({
+        google_place_id: placeId,
+        name,
+        address,
+        lat: null,
+        lng: null,
+        website: null,
+        apple_maps_url: appleMapsUrl,
+        yelp_url: yelpUrl,
+      });
+
+      setManualName('');
+      setManualAddress('');
+      onRestaurantSelected(restaurantId);
+    } catch (e) {
+      console.error('Manual add error:', e);
+      Alert.alert('Error', 'Could not add restaurant.');
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function selectPlace(place: PlaceResult) {
     setLoading(true);
@@ -128,6 +176,7 @@ export function RestaurantSearch({ onRestaurantSelected, placeholder = 'Search f
         data={results}
         keyExtractor={(item) => item.id}
         keyboardShouldPersistTaps="handled"
+        contentContainerStyle={hasSearched ? styles.listContent : undefined}
         renderItem={({ item }) => (
           <TouchableOpacity style={styles.result} onPress={() => selectPlace(item)}>
             <Text style={styles.resultName}>{item.name}</Text>
@@ -136,6 +185,56 @@ export function RestaurantSearch({ onRestaurantSelected, placeholder = 'Search f
         )}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
       />
+
+      {hasSearched && (
+        <TouchableOpacity
+          style={styles.manualBtn}
+          onPress={() => setManualVisible(true)}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.manualBtnText}>Add Manually</Text>
+        </TouchableOpacity>
+      )}
+
+      <Modal
+        visible={manualVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setManualVisible(false)}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={() => setManualVisible(false)}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalWrapper}
+          >
+            <Pressable style={styles.modalSheet}>
+              <Text style={styles.modalTitle}>Add Restaurant Manually</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Restaurant name *"
+                value={manualName}
+                onChangeText={setManualName}
+                autoFocus
+                returnKeyType="next"
+              />
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Address (optional)"
+                value={manualAddress}
+                onChangeText={setManualAddress}
+                returnKeyType="done"
+                onSubmitEditing={addManually}
+              />
+              <TouchableOpacity style={styles.modalSubmitBtn} onPress={addManually}>
+                <Text style={styles.modalSubmitText}>Add Restaurant</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setManualVisible(false)}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </Pressable>
+          </KeyboardAvoidingView>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -168,4 +267,52 @@ const styles = StyleSheet.create({
   resultName: { fontSize: 15, fontWeight: '600', color: '#1a1a1a' },
   resultAddress: { fontSize: 13, color: '#666', marginTop: 2 },
   separator: { height: 1, backgroundColor: '#eee', marginLeft: 16 },
+  listContent: { paddingBottom: 72 },
+  manualBtn: {
+    position: 'absolute',
+    bottom: 0,
+    left: 16,
+    right: 16,
+    backgroundColor: '#FF6B35',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 5,
+    marginBottom: 12,
+  },
+  manualBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  modalWrapper: { justifyContent: 'flex-end' },
+  modalSheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 24,
+    paddingBottom: 40,
+    gap: 12,
+  },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: '#1a1a1a', marginBottom: 4 },
+  modalInput: {
+    height: 48,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    fontSize: 16,
+    backgroundColor: '#f5f5f5',
+  },
+  modalSubmitBtn: {
+    backgroundColor: '#FF6B35',
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  modalSubmitText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  modalCancelBtn: { alignItems: 'center', paddingVertical: 10 },
+  modalCancelText: { color: '#888', fontSize: 15 },
 });
