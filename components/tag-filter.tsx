@@ -87,9 +87,6 @@ export function TagFilter({ selectedTags, onChange, tagCounts }: Props) {
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Filter by Tag</Text>
-            <TouchableOpacity onPress={() => setModalVisible(false)}>
-              <Text style={styles.modalDone}>Done</Text>
-            </TouchableOpacity>
           </View>
 
           <TextInput
@@ -162,6 +159,13 @@ export function TagFilter({ selectedTags, onChange, tagCounts }: Props) {
                 {sortMode === 'category' ? 'Quantity' : 'Category'}
               </Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.doneBtn}
+              onPress={() => setModalVisible(false)}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.doneBtnText}>Done</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -210,20 +214,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
     borderColor: '#eee',
+    alignItems: 'center',
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: '600',
-  },
-  modalDone: {
-    fontSize: 16,
-    color: '#FF6B35',
     fontWeight: '600',
   },
   searchInput: {
@@ -302,21 +299,37 @@ const styles = StyleSheet.create({
   },
   // Footer
   modalFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     borderTopWidth: 1,
     borderTopColor: '#eee',
     paddingTop: 12,
     paddingHorizontal: 12,
-    alignItems: 'flex-end',
   },
   sortModeBtn: {
-    backgroundColor: '#FF6B35',
+    backgroundColor: '#f0f0f0',
     borderRadius: 20,
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 10,
+    borderWidth: 1.5,
+    borderColor: '#222',
   },
   sortModeBtnText: {
-    color: '#fff',
+    color: '#222',
     fontSize: 14,
+    fontWeight: '600',
+  },
+  doneBtn: {
+    flex: 1,
+    backgroundColor: '#FF6B35',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  doneBtnText: {
+    color: '#fff',
+    fontSize: 16,
     fontWeight: '600',
   },
 });

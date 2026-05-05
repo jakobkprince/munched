@@ -15,6 +15,20 @@ export function useDishActions() {
       .select('id')
       .single();
     if (error) throw error;
+
+    const { data: restaurantTags } = await supabase
+      .from('restaurant_tags')
+      .select('tag')
+      .eq('restaurant_id', restaurantId);
+    if (restaurantTags && restaurantTags.length > 0) {
+      await supabase
+        .from('dish_tags')
+        .upsert(
+          restaurantTags.map(({ tag }) => ({ dish_id: data.id, tag })),
+          { onConflict: 'dish_id,tag', ignoreDuplicates: true }
+        );
+    }
+
     return data.id;
   }
 

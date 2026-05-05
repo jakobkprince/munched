@@ -29,6 +29,10 @@ export const TAG_GROUPS: TagGroup[] = [
     tags: ['American', 'BBQ', 'Burgers', 'Steakhouse'],
   },
   {
+    label: 'Sandwich',
+    tags: ['Sandwich'],
+  },
+  {
     label: 'Southern',
     tags: ['Southern/Soul Food'],
   },

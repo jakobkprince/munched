@@ -40,7 +40,6 @@ export default function RestaurantPage() {
   const [autoTagSheet, setAutoTagSheet] = useState(false);
   const [pendingDishName, setPendingDishName] = useState<string | null>(null);
   const [newDishMunchSheet, setNewDishMunchSheet] = useState(false);
-  const [newDishEatListSheet, setNewDishEatListSheet] = useState(false);
   const [addDishModal, setAddDishModal] = useState(false);
   const [addDishName, setAddDishName] = useState('');
   const [prevMunchesSheet, setPrevMunchesSheet] = useState(false);
@@ -238,11 +237,10 @@ export default function RestaurantPage() {
     const name = addDishName.trim();
     if (!name) return;
     setAddDishModal(false);
-    setPendingDishName(name);
     Alert.alert('Add to...', '', [
-      { text: 'Eat-List', onPress: () => setNewDishEatListSheet(true) },
-      { text: 'Munched', onPress: () => setNewDishMunchSheet(true) },
-      { text: 'Cancel', style: 'cancel', onPress: () => setPendingDishName(null) },
+      { text: 'Eat-List', onPress: () => handleNewDishEatList(name) },
+      { text: 'Munched', onPress: () => { setPendingDishName(name); setNewDishMunchSheet(true); } },
+      { text: 'Cancel', style: 'cancel' },
     ]);
   }
 
@@ -269,15 +267,12 @@ export default function RestaurantPage() {
     }
   }
 
-  async function handleNewDishEatList(notes: string) {
-    if (!pendingDishName) return;
+  async function handleNewDishEatList(dishName: string) {
     setActionLoading(true);
     try {
-      const dishId = await dishActions.addDish(id, pendingDishName);
-      await dishActions.addToEatList(dishId, notes);
+      const dishId = await dishActions.addDish(id, dishName);
+      await dishActions.addToEatList(dishId, '');
       refreshDishes();
-      setNewDishEatListSheet(false);
-      setPendingDishName(null);
     } catch (e) {
       Alert.alert('Error', e instanceof Error ? e.message : 'Failed to add to Eat-List');
     } finally {
@@ -479,7 +474,7 @@ export default function RestaurantPage() {
       <View style={styles.actionArea}>
         {!status.inEatList && !status.inMunched && (
           <View style={styles.buttonRow}>
-            <TouchableOpacity style={styles.secondaryBtn} onPress={() => setEatListSheet(true)}>
+            <TouchableOpacity style={styles.secondaryBtn} onPress={() => handleAddToEatList('')}>
               <Text style={styles.secondaryBtnText}>Add to Eat-List</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.primaryBtn} onPress={() => setMunchedSheet(true)}>
@@ -550,13 +545,6 @@ export default function RestaurantPage() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-      <AddToEatListSheet
-        visible={newDishEatListSheet}
-        title="Add to Eat-List"
-        onConfirm={handleNewDishEatList}
-        onClose={() => { setNewDishEatListSheet(false); setPendingDishName(null); }}
-        loading={actionLoading}
-      />
       <AddToMunchedSheet
         visible={newDishMunchSheet}
         showVibeRating={false}

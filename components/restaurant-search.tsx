@@ -149,17 +149,41 @@ export function RestaurantSearch({ onRestaurantSelected, placeholder = 'Search f
 
   return (
     <View style={styles.container}>
-      <View style={styles.inputRow}>
-        <TextInput
-          style={styles.input}
-          value={query}
-          onChangeText={setQuery}
-          placeholder={placeholder}
-          autoFocus
-          clearButtonMode="while-editing"
-          returnKeyType="search"
-          onSubmitEditing={() => runSearch(query)}
-        />
+      <TextInput
+        style={styles.input}
+        value={query}
+        onChangeText={setQuery}
+        placeholder={placeholder}
+        autoFocus
+        clearButtonMode="while-editing"
+        returnKeyType="search"
+        onSubmitEditing={() => runSearch(query)}
+      />
+
+      <FlatList
+        data={results}
+        keyExtractor={(item) => item.id}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.listContent}
+        renderItem={({ item }) => (
+          <TouchableOpacity style={styles.result} onPress={() => selectPlace(item)}>
+            <Text style={styles.resultName}>{item.name}</Text>
+            {item.address && <Text style={styles.resultAddress}>{item.address}</Text>}
+          </TouchableOpacity>
+        )}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
+      />
+
+      <View style={styles.bottomBar}>
+        {hasSearched && (
+          <TouchableOpacity
+            style={styles.manualBtn}
+            onPress={() => setManualVisible(true)}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.manualBtnText}>Add Manually</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           style={[styles.searchBtn, loading && styles.searchBtnDisabled]}
           onPress={() => runSearch(query)}
@@ -171,30 +195,6 @@ export function RestaurantSearch({ onRestaurantSelected, placeholder = 'Search f
           }
         </TouchableOpacity>
       </View>
-
-      <FlatList
-        data={results}
-        keyExtractor={(item) => item.id}
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={hasSearched ? styles.listContent : undefined}
-        renderItem={({ item }) => (
-          <TouchableOpacity style={styles.result} onPress={() => selectPlace(item)}>
-            <Text style={styles.resultName}>{item.name}</Text>
-            {item.address && <Text style={styles.resultAddress}>{item.address}</Text>}
-          </TouchableOpacity>
-        )}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-      />
-
-      {hasSearched && (
-        <TouchableOpacity
-          style={styles.manualBtn}
-          onPress={() => setManualVisible(true)}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.manualBtnText}>Add Manually</Text>
-        </TouchableOpacity>
-      )}
 
       <Modal
         visible={manualVisible}
@@ -241,9 +241,7 @@ export function RestaurantSearch({ onRestaurantSelected, placeholder = 'Search f
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  inputRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, gap: 8 },
   input: {
-    flex: 1,
     height: 44,
     borderWidth: 1,
     borderColor: '#ddd',
@@ -251,40 +249,39 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     fontSize: 16,
     backgroundColor: '#f5f5f5',
+    marginHorizontal: 16,
+    marginVertical: 8,
   },
-  searchBtn: {
-    backgroundColor: '#FF6B35',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    minWidth: 72,
-  },
-  searchBtnDisabled: { opacity: 0.6 },
-  searchBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
   result: { paddingHorizontal: 16, paddingVertical: 12 },
   resultName: { fontSize: 15, fontWeight: '600', color: '#1a1a1a' },
   resultAddress: { fontSize: 13, color: '#666', marginTop: 2 },
   separator: { height: 1, backgroundColor: '#eee', marginLeft: 16 },
-  listContent: { paddingBottom: 72 },
-  manualBtn: {
-    position: 'absolute',
-    bottom: 0,
-    left: 16,
-    right: 16,
+  listContent: { paddingBottom: 8 },
+  bottomBar: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 24,
+    gap: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    backgroundColor: '#fff',
+  },
+  searchBtn: {
     backgroundColor: '#FF6B35',
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.18,
-    shadowRadius: 6,
-    elevation: 5,
-    marginBottom: 12,
   },
-  manualBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  searchBtnDisabled: { opacity: 0.6 },
+  searchBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  manualBtn: {
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FF6B35',
+  },
+  manualBtnText: { color: '#FF6B35', fontSize: 16, fontWeight: '600' },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalWrapper: { justifyContent: 'flex-end' },
   modalSheet: {
