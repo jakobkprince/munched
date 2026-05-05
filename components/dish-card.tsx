@@ -9,7 +9,7 @@ interface Props {
 
 export function DishCard({ item }: Props) {
   const router = useRouter();
-  const { dish, restaurant, latestLog } = item;
+  const { dish, restaurant, latestLog, tags } = item;
 
   return (
     <TouchableOpacity
@@ -29,6 +29,9 @@ export function DishCard({ item }: Props) {
           <Text style={styles.restaurantName} numberOfLines={1}>{restaurant.name}</Text>
         </TouchableOpacity>
         <StarRating value={latestLog.rating ?? 0} size={16} />
+        {tags.length > 0 && (
+          <Text style={styles.tags} numberOfLines={1}>{tags.join(' · ')}</Text>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -60,5 +63,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#FF6B35',
     fontWeight: '500',
+  },
+  tags: {
+    fontSize: 12,
+    color: '#999',
   },
 });

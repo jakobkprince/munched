@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,28 +15,60 @@ interface Props {
   selectedTags: string[];
   onAdd: (tag: string) => void;
   onClose: () => void;
+  // Multi-select mode: pre-select initialTags, Done calls onDone with final selection
+  initialTags?: string[];
+  onDone?: (tags: string[]) => void;
 }
 
-export function TagPickerSheet({ visible, selectedTags, onAdd, onClose }: Props) {
+export function TagPickerSheet({ visible, selectedTags, onAdd, onClose, initialTags, onDone }: Props) {
   const [search, setSearch] = useState('');
+  const [pending, setPending] = useState<Set<string>>(new Set());
+
+  const multiSelect = !!onDone;
+
+  useEffect(() => {
+    if (visible && multiSelect && initialTags) {
+      setPending(new Set(initialTags.filter((t) => !selectedTags.includes(t))));
+    }
+    if (!visible) setSearch('');
+  }, [visible]);
 
   const filtered = TAG_GROUPS.map((group) => ({
     ...group,
-    tags: group.tags.filter(
-      (t) =>
-        t.toLowerCase().includes(search.toLowerCase()) &&
-        !selectedTags.includes(t)
-    ),
+    tags: group.tags.filter((t) => {
+      if (!t.toLowerCase().includes(search.toLowerCase())) return false;
+      if (multiSelect) return !selectedTags.includes(t);
+      return !selectedTags.includes(t);
+    }),
   })).filter((g) => g.tags.length > 0);
+
+  function toggleTag(tag: string) {
+    setPending((prev) => {
+      const next = new Set(prev);
+      if (next.has(tag)) next.delete(tag);
+      else next.add(tag);
+      return next;
+    });
+  }
+
+  function handleDone() {
+    onDone!(Array.from(pending));
+  }
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.title}>Add Tag</Text>
-          <TouchableOpacity onPress={onClose}>
-            <Text style={styles.close}>Done</Text>
-          </TouchableOpacity>
+          <Text style={styles.title}>{multiSelect ? 'Add Tags' : 'Add Tag'}</Text>
+          {multiSelect ? (
+            <TouchableOpacity onPress={handleDone}>
+              <Text style={styles.close}>Done</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity onPress={onClose}>
+              <Text style={styles.close}>Done</Text>
+            </TouchableOpacity>
+          )}
         </View>
         <TextInput
           style={styles.search}
@@ -50,15 +82,25 @@ export function TagPickerSheet({ visible, selectedTags, onAdd, onClose }: Props)
             <View key={group.label}>
               <Text style={styles.groupLabel}>{group.label}</Text>
               <View style={styles.tagRow}>
-                {group.tags.map((tag) => (
-                  <TouchableOpacity
-                    key={tag}
-                    style={styles.tag}
-                    onPress={() => { onAdd(tag); onClose(); }}
-                  >
-                    <Text style={styles.tagText}>{tag}</Text>
-                  </TouchableOpacity>
-                ))}
+                {group.tags.map((tag) => {
+                  const isSelected = multiSelect && pending.has(tag);
+                  return (
+                    <TouchableOpacity
+                      key={tag}
+                      style={[styles.tag, isSelected && styles.tagSelected]}
+                      onPress={() => {
+                        if (multiSelect) {
+                          toggleTag(tag);
+                        } else {
+                          onAdd(tag);
+                          onClose();
+                        }
+                      }}
+                    >
+                      <Text style={[styles.tagText, isSelected && styles.tagTextSelected]}>{tag}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </View>
           ))}
@@ -77,5 +119,7 @@ const styles = StyleSheet.create({
   groupLabel: { fontSize: 13, fontWeight: '600', color: '#888', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4, textTransform: 'uppercase' },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, gap: 8, paddingBottom: 8 },
   tag: { backgroundColor: '#f0f0f0', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8 },
+  tagSelected: { backgroundColor: '#FF6B35' },
   tagText: { fontSize: 14, color: '#333' },
+  tagTextSelected: { color: '#fff', fontWeight: '600' },
 });

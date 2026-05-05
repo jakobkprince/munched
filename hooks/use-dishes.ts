@@ -9,19 +9,22 @@ export function useRestaurantDishes(restaurantId: string) {
   const [dishes, setDishes] = useState<Dish[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetch = useCallback(async () => {
-    setLoading(true);
+  const fetch = useCallback(async (showLoading = false) => {
+    if (showLoading) setLoading(true);
     const { data } = await supabase
       .from('dishes')
-      .select('*')
+      .select('*, eat_list_dishes(id), dish_logs(id)')
       .eq('restaurant_id', restaurantId)
       .order('name');
-    setDishes(data ?? []);
+    const relevant = (data ?? []).filter(
+      (d) => d.eat_list_dishes.length > 0 || d.dish_logs.length > 0
+    );
+    setDishes(relevant);
     setLoading(false);
   }, [restaurantId]);
 
-  useEffect(() => { fetch(); }, [fetch]);
-  return { dishes, loading, refresh: fetch };
+  useEffect(() => { fetch(true); }, [fetch]);
+  return { dishes, loading, refresh: () => fetch(false) };
 }
 
 export function useMunchedDishes(

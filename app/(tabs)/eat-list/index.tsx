@@ -45,10 +45,11 @@ function EatListRestaurantCard({ item }: { item: EatListRestaurantView }) {
         <Text style={cardStyles.name} numberOfLines={1}>{item.restaurant.name}</Text>
         <Text style={cardStyles.date}>{dateAdded}</Text>
       </View>
-      {notesPreview ? (
+      {notesPreview && (
         <Text style={cardStyles.notes} numberOfLines={2}>{notesPreview}</Text>
-      ) : (
-        <Text style={cardStyles.noNotes}>No notes</Text>
+      )}
+      {item.tags.length > 0 && (
+        <Text style={cardStyles.tags} numberOfLines={1}>{item.tags.join(' · ')}</Text>
       )}
     </TouchableOpacity>
   );
@@ -94,6 +95,10 @@ const cardStyles = StyleSheet.create({
     fontSize: 13,
     color: '#bbb',
     fontStyle: 'italic',
+  },
+  tags: {
+    fontSize: 12,
+    color: '#999',
   },
 });
 
@@ -154,13 +159,6 @@ export default function EatListRestaurants() {
             keyboardShouldPersistTaps="handled"
           />
         )}
-        <TouchableOpacity
-          style={styles.fab}
-          onPress={() => router.push('/search')}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.fabIcon}>+</Text>
-        </TouchableOpacity>
       </View>
 
       {/* Bottom controls */}
@@ -205,7 +203,12 @@ export default function EatListRestaurants() {
             />
           </TouchableOpacity>
         </View>
-        <TagFilter selectedTags={tagFilter} onChange={setTagFilter} tagCounts={tagCounts} />
+        <View style={styles.tagFilterRow}>
+          <TagFilter selectedTags={tagFilter} onChange={setTagFilter} tagCounts={tagCounts} />
+          <TouchableOpacity style={styles.fab} onPress={() => router.push('/search')} activeOpacity={0.85}>
+            <Text style={styles.fabIcon}>+</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -266,26 +269,28 @@ const styles = StyleSheet.create({
     marginTop: 60,
     fontSize: 15,
   },
+  tagFilterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingRight: 16,
+  },
   fab: {
-    position: 'absolute',
-    bottom: 16,
-    right: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#FF6B35',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
     elevation: 6,
   },
   fabIcon: {
-    fontSize: 30,
+    fontSize: 28,
     color: '#fff',
-    lineHeight: 34,
+    lineHeight: 32,
     fontWeight: '300',
   },
   bottomBar: {

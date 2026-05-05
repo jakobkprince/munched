@@ -55,10 +55,11 @@ function EatListDishCard({ item }: { item: EatListDishView }) {
       >
         <Text style={cardStyles.restaurantName} numberOfLines={1}>{item.restaurant.name}</Text>
       </TouchableOpacity>
-      {notesPreview ? (
+      {notesPreview && (
         <Text style={cardStyles.notes} numberOfLines={2}>{notesPreview}</Text>
-      ) : (
-        <Text style={cardStyles.noNotes}>No notes</Text>
+      )}
+      {item.tags.length > 0 && (
+        <Text style={cardStyles.tags} numberOfLines={1}>{item.tags.join(' · ')}</Text>
       )}
     </TouchableOpacity>
   );
@@ -106,6 +107,10 @@ const cardStyles = StyleSheet.create({
     color: '#555',
     lineHeight: 18,
   },
+  tags: {
+    fontSize: 12,
+    color: '#999',
+  },
   noNotes: {
     fontSize: 13,
     color: '#bbb',
@@ -129,7 +134,7 @@ export default function EatListDishes() {
   const filtered = useMemo<EatListDishView[]>(() => {
     if (!search.trim()) return data;
     const q = search.toLowerCase();
-    return data.filter((d) => d.dish.name.toLowerCase().includes(q));
+    return data.filter((d) => d.dish.name.toLowerCase().includes(q) || d.restaurant.name.toLowerCase().includes(q));
   }, [data, search]);
 
   function handleSortChange(value: string) {

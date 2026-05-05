@@ -86,6 +86,11 @@ export function useDishActions() {
     }
   }
 
+  async function deleteDish(dishId: string): Promise<void> {
+    const { error } = await supabase.from('dishes').delete().eq('id', dishId);
+    if (error) throw error;
+  }
+
   async function deleteFromEatList(id: string): Promise<void> {
     const { error } = await supabase.from('eat_list_dishes').delete().eq('id', id);
     if (error) throw error;
@@ -113,5 +118,5 @@ export function useDishActions() {
     if (error) throw error;
   }
 
-  return { addDish, addToEatList, addToMunched, reMunch, deleteFromEatList, deleteLog, editEatListEntry, editDishLog };
+  return { addDish, addToEatList, addToMunched, reMunch, deleteDish, deleteFromEatList, deleteLog, editEatListEntry, editDishLog };
 }

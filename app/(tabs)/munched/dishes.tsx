@@ -46,7 +46,7 @@ export default function MunchedDishes() {
   const filtered = useMemo<MunchedDish[]>(() => {
     if (!search.trim()) return data;
     const q = search.toLowerCase();
-    return data.filter((d) => d.dish.name.toLowerCase().includes(q));
+    return data.filter((d) => d.dish.name.toLowerCase().includes(q) || d.restaurant.name.toLowerCase().includes(q));
   }, [data, search]);
 
   function handleSortChange(value: string) {

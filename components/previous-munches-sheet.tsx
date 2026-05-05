@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   View, Text, TouchableOpacity, FlatList, ScrollView,
-  StyleSheet, Modal, Image,
+  StyleSheet, Modal, Image, Alert,
 } from 'react-native';
 import { RestaurantLog, DishLog, Photo } from '../types';
 import { StarRating } from './star-rating';
@@ -14,9 +14,10 @@ interface Props {
   logs: Log[];
   photos: Photo[];
   onClose: () => void;
+  onDeleteLog?: (logId: string) => Promise<void>;
 }
 
-export function PreviousMunchesSheet({ visible, logs, photos, onClose }: Props) {
+export function PreviousMunchesSheet({ visible, logs, photos, onClose, onDeleteLog }: Props) {
   const [selectedLog, setSelectedLog] = useState<Log | null>(null);
   const { getPublicUrl } = usePhotos();
 
@@ -43,15 +44,9 @@ export function PreviousMunchesSheet({ visible, logs, photos, onClose }: Props) 
       <View style={styles.container}>
         {selectedLog ? (
           <>
-            {/* Detail header */}
+            {/* Detail header — title only */}
             <View style={styles.header}>
-              <TouchableOpacity onPress={() => setSelectedLog(null)}>
-                <Text style={styles.back}>← Back</Text>
-              </TouchableOpacity>
               <Text style={styles.title}>{formatDate(selectedLog.log_date)}</Text>
-              <TouchableOpacity onPress={onClose}>
-                <Text style={styles.close}>Done</Text>
-              </TouchableOpacity>
             </View>
 
             {/* Detail content */}
@@ -83,15 +78,40 @@ export function PreviousMunchesSheet({ visible, logs, photos, onClose }: Props) 
                 </View>
               )}
             </ScrollView>
+
+            {/* Bottom buttons */}
+            <View style={styles.bottomBar}>
+              <TouchableOpacity style={styles.bottomBtn} onPress={() => setSelectedLog(null)}>
+                <Text style={styles.back}>← Back</Text>
+              </TouchableOpacity>
+              {onDeleteLog && (
+                <TouchableOpacity
+                  style={styles.bottomBtn}
+                  onPress={() => {
+                    Alert.alert('Delete Munch', 'Delete this munch log?', [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Delete', style: 'destructive', onPress: async () => {
+                          await onDeleteLog(selectedLog!.id);
+                          setSelectedLog(null);
+                        },
+                      },
+                    ]);
+                  }}
+                >
+                  <Text style={styles.deleteBtn}>Delete</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity style={styles.bottomBtn} onPress={onClose}>
+                <Text style={styles.close}>Done</Text>
+              </TouchableOpacity>
+            </View>
           </>
         ) : (
           <>
             {/* List header */}
             <View style={styles.header}>
               <Text style={styles.title}>Previous Munches</Text>
-              <TouchableOpacity onPress={onClose}>
-                <Text style={styles.close}>Done</Text>
-              </TouchableOpacity>
             </View>
 
             {/* Log list */}
@@ -119,6 +139,13 @@ export function PreviousMunchesSheet({ visible, logs, photos, onClose }: Props) 
               ItemSeparatorComponent={() => <View style={styles.sep} />}
               contentContainerStyle={styles.list}
             />
+
+            {/* Bottom Done button */}
+            <View style={styles.bottomBar}>
+              <TouchableOpacity style={[styles.bottomBtn, { marginLeft: 'auto' }]} onPress={onClose}>
+                <Text style={styles.close}>Done</Text>
+              </TouchableOpacity>
+            </View>
           </>
         )}
       </View>
@@ -164,4 +191,14 @@ const styles = StyleSheet.create({
   empty: { fontSize: 14, color: '#aaa', fontStyle: 'italic' },
   photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   photo: { width: 120, height: 120, borderRadius: 8 },
+  bottomBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderTopWidth: 1,
+    borderColor: '#eee',
+  },
+  bottomBtn: { padding: 4 },
+  deleteBtn: { fontSize: 16, color: '#c00', fontWeight: '600' },
 });

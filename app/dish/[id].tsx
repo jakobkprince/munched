@@ -7,6 +7,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useDishActions } from '../../hooks/use-dish-actions';
+import { useRestaurantActions } from '../../hooks/use-restaurant-actions';
 import { useTags } from '../../hooks/use-tags';
 import { usePhotos } from '../../hooks/use-photos';
 import { StarRating } from '../../components/star-rating';
@@ -25,8 +26,10 @@ interface DishStatus {
 
 export default function DishPage() {
   const insets = useSafeAreaInsets();
-  const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
+  const { id, from, restaurantTags: restaurantTagsParam } = useLocalSearchParams<{ id: string; from?: string; restaurantTags?: string }>();
+  const restaurantTagsFromParam = restaurantTagsParam ? restaurantTagsParam.split(',').filter(Boolean) : [];
   const actions = useDishActions();
+  const restaurantActions = useRestaurantActions();
   const tagActions = useTags();
   const { getPublicUrl } = usePhotos();
 
@@ -41,9 +44,11 @@ export default function DishPage() {
   const [munchedSheet, setMunchedSheet] = useState(false);
   const [eatListSheet, setEatListSheet] = useState(false);
   const [tagSheet, setTagSheet] = useState(false);
+  const [autoTagSheet, setAutoTagSheet] = useState(false);
   const [prevMunchesSheet, setPrevMunchesSheet] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [restaurantMunchSheet, setRestaurantMunchSheet] = useState(false);
 
   const loadDish = useCallback(async () => {
     setLoading(true);
@@ -97,6 +102,7 @@ export default function DishPage() {
   const inAnyList = status.inEatList || status.inMunched;
 
   async function handleAddToMunched(data: { rating: number; vibe_rating?: number; notes: string; log_date: string; photoUris: string[] }) {
+    const wasInEatList = status.inEatList;
     setActionLoading(true);
     try {
       await actions.addToMunched(id, {
@@ -106,11 +112,57 @@ export default function DishPage() {
         photoUris: data.photoUris,
       });
       await loadDish();
+      if (!wasInEatList && restaurantTagsFromParam.length > 0) {
+        setAutoTagSheet(true);
+      }
+      if (from === 'eat-list') {
+        router.navigate('/(tabs)/munched/dishes');
+        router.push(`/dish/${id}?from=munched`);
+        return;
+      }
+      // Check if the restaurant is in Eat-List but not yet in Munched
+      if (restaurant) {
+        const [eatListRes, logsRes] = await Promise.all([
+          supabase.from('eat_list_restaurants').select('id').eq('restaurant_id', restaurant.id).maybeSingle(),
+          supabase.from('restaurant_logs').select('id').eq('restaurant_id', restaurant.id).limit(1),
+        ]);
+        const restaurantInEatList = !!eatListRes.data;
+        const restaurantInMunched = (logsRes.data ?? []).length > 0;
+        if (restaurantInEatList && !restaurantInMunched) {
+          Alert.alert(
+            `Add ${restaurant.name} to Munched?`,
+            '',
+            [
+              { text: 'Later', style: 'cancel' },
+              { text: 'Yes', onPress: () => setRestaurantMunchSheet(true) },
+            ]
+          );
+        }
+      }
     } catch (e) {
       Alert.alert('Error', e instanceof Error ? e.message : 'Failed to log dish');
     } finally {
       setActionLoading(false);
       setMunchedSheet(false);
+    }
+  }
+
+  async function handleAddRestaurantToMunched(data: { rating: number; vibe_rating?: number; notes: string; log_date: string; photoUris: string[] }) {
+    if (!restaurant) return;
+    setActionLoading(true);
+    try {
+      await restaurantActions.addToMunched(restaurant.id, {
+        rating: data.rating,
+        vibe_rating: data.vibe_rating,
+        notes: data.notes,
+        log_date: data.log_date,
+        photoUris: data.photoUris,
+      });
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : 'Failed to log restaurant');
+    } finally {
+      setActionLoading(false);
+      setRestaurantMunchSheet(false);
     }
   }
 
@@ -129,6 +181,19 @@ export default function DishPage() {
     } finally {
       setActionLoading(false);
       setMunchedSheet(false);
+    }
+  }
+
+  async function handleAutoTag(newTags: string[]) {
+    try {
+      for (const tag of newTags) {
+        await tagActions.addDishTag(id, tag);
+      }
+      await loadDish();
+    } catch (e) {
+      Alert.alert('Error', 'Failed to add tags');
+    } finally {
+      setAutoTagSheet(false);
     }
   }
 
@@ -151,20 +216,28 @@ export default function DishPage() {
   }
 
   function showThreeDotMenu() {
-    const options = status.inMunched
-      ? ['Edit', 'Delete', 'View Previous Munches', 'Cancel']
-      : ['Edit', 'Delete', 'Cancel'];
+    const orphaned = !status.inEatList && !status.inMunched;
+    const options = orphaned
+      ? ['Delete Dish', 'Cancel']
+      : status.inMunched
+        ? ['Edit', 'Delete', 'View Previous Munches', 'Cancel']
+        : ['Edit', 'Delete', 'Cancel'];
 
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
-        { options, cancelButtonIndex: options.length - 1, destructiveButtonIndex: 1 },
+        { options, cancelButtonIndex: options.length - 1, destructiveButtonIndex: 0 },
         (index) => handleMenuAction(options[index])
       );
     } else {
       Alert.alert('Options', '', [
-        { text: 'Edit', onPress: () => handleMenuAction('Edit') },
-        { text: 'Delete', style: 'destructive', onPress: () => handleMenuAction('Delete') },
-        ...(status.inMunched ? [{ text: 'View Previous Munches', onPress: () => handleMenuAction('View Previous Munches') }] : []),
+        ...(orphaned
+          ? [{ text: 'Delete Dish', style: 'destructive' as const, onPress: () => handleMenuAction('Delete Dish') }]
+          : [
+              { text: 'Edit', onPress: () => handleMenuAction('Edit') },
+              { text: 'Delete', style: 'destructive' as const, onPress: () => handleMenuAction('Delete') },
+              ...(status.inMunched ? [{ text: 'View Previous Munches', onPress: () => handleMenuAction('View Previous Munches') }] : []),
+            ]
+        ),
         { text: 'Cancel', style: 'cancel' as const },
       ]);
     }
@@ -213,18 +286,48 @@ export default function DishPage() {
         setEatListSheet(true);
       }
     } else if (action === 'Delete') {
-      const listName = status.inMunched ? 'Munched' : 'Eat-List';
-      Alert.alert('Delete', `Remove this dish from ${listName}?`, [
+      if (status.inMunched) {
+        Alert.alert('Delete All Munches?', 'This will permanently delete all munch history for this dish.', [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete', style: 'destructive', onPress: async () => {
+              try {
+                const { error } = await supabase.from('dish_logs').delete().eq('dish_id', id);
+                if (error) throw error;
+                await loadDish();
+              } catch (e) {
+                Alert.alert('Error', e instanceof Error ? e.message : 'Failed to delete');
+              }
+            },
+          },
+        ]);
+      } else if (status.inEatList && status.eatListEntry) {
+        Alert.alert('Delete', 'Remove this dish from Eat-List?', [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete', style: 'destructive', onPress: async () => {
+              try {
+                await actions.deleteFromEatList(status.eatListEntry!.id);
+                if (from === 'eat-list') {
+                  router.back();
+                } else {
+                  await loadDish();
+                }
+              } catch (e) {
+                Alert.alert('Error', e instanceof Error ? e.message : 'Failed to delete');
+              }
+            },
+          },
+        ]);
+      }
+    } else if (action === 'Delete Dish') {
+      Alert.alert('Delete Dish', 'Permanently delete this dish?', [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete', style: 'destructive', onPress: async () => {
             try {
-              if (status.inEatList && status.eatListEntry) {
-                await actions.deleteFromEatList(status.eatListEntry.id);
-              } else if (status.inMunched && latestLog) {
-                await actions.deleteLog(latestLog.id);
-              }
-              await loadDish();
+              await actions.deleteDish(id);
+              router.back();
             } catch (e) {
               Alert.alert('Error', e instanceof Error ? e.message : 'Failed to delete');
             }
@@ -249,11 +352,9 @@ export default function DishPage() {
       {/* Header */}
       <View style={styles.headerRow}>
         <Text style={styles.name}>{dish.name}</Text>
-        {inAnyList && (
-          <TouchableOpacity onPress={showThreeDotMenu} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="ellipsis-horizontal" size={24} color="#333" />
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity onPress={showThreeDotMenu} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Ionicons name="ellipsis-horizontal" size={24} color="#333" />
+        </TouchableOpacity>
       </View>
 
       {/* Restaurant link */}
@@ -372,6 +473,7 @@ export default function DishPage() {
         showVibeRating={false}
         initialRating={isEditMode ? (latestLog?.rating ?? 0) : 0}
         initialNotes={isEditMode ? (latestLog?.notes ?? '') : (status.eatListEntry?.notes ?? '')}
+        initialLogDate={isEditMode ? (latestLog?.log_date ?? undefined) : undefined}
         onConfirm={isEditMode ? handleEditMunched : (status.inMunched ? handleReMunch : handleAddToMunched)}
         onClose={() => { setMunchedSheet(false); setIsEditMode(false); }}
         loading={actionLoading}
@@ -383,11 +485,31 @@ export default function DishPage() {
         onAdd={handleAddTag}
         onClose={() => setTagSheet(false)}
       />
+      <TagPickerSheet
+        visible={autoTagSheet}
+        selectedTags={[]}
+        initialTags={restaurantTagsFromParam}
+        onAdd={() => {}}
+        onDone={handleAutoTag}
+        onClose={() => setAutoTagSheet(false)}
+      />
+      <AddToMunchedSheet
+        visible={restaurantMunchSheet}
+        showVibeRating
+        onConfirm={handleAddRestaurantToMunched}
+        onClose={() => setRestaurantMunchSheet(false)}
+        loading={actionLoading}
+        title={`Log ${restaurant?.name ?? 'Restaurant'}`}
+      />
       <PreviousMunchesSheet
         visible={prevMunchesSheet}
         logs={allLogs}
         photos={allPhotos}
         onClose={() => setPrevMunchesSheet(false)}
+        onDeleteLog={async (logId) => {
+          await actions.deleteLog(logId);
+          await loadDish();
+        }}
       />
     </ScrollView>
 

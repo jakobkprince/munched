@@ -1,9 +1,11 @@
 import { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Linking, Alert, Image, ActionSheetIOS, Platform,
+  Linking, Alert, Image, ActionSheetIOS, Platform, Dimensions,
+  Modal, TextInput, KeyboardAvoidingView,
 } from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
+import MapView, { Marker } from 'react-native-maps';
+import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRestaurant } from '../../hooks/use-restaurants';
@@ -34,6 +36,13 @@ export default function RestaurantPage() {
   const [eatListSheet, setEatListSheet] = useState(false);
   const [munchedSheet, setMunchedSheet] = useState(false);
   const [tagSheet, setTagSheet] = useState(false);
+  const [autoTagDishId, setAutoTagDishId] = useState<string | null>(null);
+  const [autoTagSheet, setAutoTagSheet] = useState(false);
+  const [pendingDishName, setPendingDishName] = useState<string | null>(null);
+  const [newDishMunchSheet, setNewDishMunchSheet] = useState(false);
+  const [newDishEatListSheet, setNewDishEatListSheet] = useState(false);
+  const [addDishModal, setAddDishModal] = useState(false);
+  const [addDishName, setAddDishName] = useState('');
   const [prevMunchesSheet, setPrevMunchesSheet] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [allLogs, setAllLogs] = useState<RestaurantLog[]>([]);
@@ -54,6 +63,7 @@ export default function RestaurantPage() {
   }, [id, status.inMunched]);
 
   useEffect(() => { loadLogsAndPhotos(); }, [loadLogsAndPhotos]);
+  useFocusEffect(useCallback(() => { refreshDishes(); }, [refreshDishes]));
 
   if (!restaurant) {
     return <View style={styles.center}><Text>Loading...</Text></View>;
@@ -78,8 +88,13 @@ export default function RestaurantPage() {
     setActionLoading(true);
     try {
       await actions.addToMunched(id, { rating: data.rating, vibe_rating: data.vibe_rating, notes: data.notes, log_date: data.log_date, photoUris: data.photoUris });
-      await refresh();
-      await loadLogsAndPhotos();
+      if (from === 'eat-list') {
+        router.navigate('/(tabs)/munched');
+        router.push(`/restaurant/${id}?from=munched`);
+      } else {
+        await refresh();
+        await loadLogsAndPhotos();
+      }
     } catch (e) {
       Alert.alert('Error', e instanceof Error ? e.message : 'Failed to log');
     } finally {
@@ -178,40 +193,109 @@ export default function RestaurantPage() {
         setEatListSheet(true);
       }
     } else if (action === 'Delete') {
-      Alert.alert('Delete', `Remove this restaurant from ${status.inEatList ? 'Eat-List' : 'Munched'}?`, [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete', style: 'destructive', onPress: async () => {
-            if (status.inEatList && status.eatListEntry) {
-              await actions.deleteFromEatList(status.eatListEntry.id);
-            } else if (status.inMunched && latestLog) {
-              await actions.deleteLog(latestLog.id);
-            }
-            await refresh();
-            await loadLogsAndPhotos();
-          }
-        },
-      ]);
+      if (status.inMunched) {
+        Alert.alert('Delete All Munches?', 'This will permanently delete all munch history for this restaurant.', [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete', style: 'destructive', onPress: async () => {
+              try {
+                const { error } = await supabase.from('restaurant_logs').delete().eq('restaurant_id', id);
+                if (error) throw error;
+                await refresh();
+                await loadLogsAndPhotos();
+              } catch (e) {
+                Alert.alert('Error', e instanceof Error ? e.message : 'Failed to delete');
+              }
+            },
+          },
+        ]);
+      } else if (status.inEatList && status.eatListEntry) {
+        Alert.alert('Delete', 'Remove this restaurant from Eat-List?', [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete', style: 'destructive', onPress: async () => {
+              try {
+                await actions.deleteFromEatList(status.eatListEntry!.id);
+                await refresh();
+              } catch (e) {
+                Alert.alert('Error', e instanceof Error ? e.message : 'Failed to delete');
+              }
+            },
+          },
+        ]);
+      }
     } else if (action === 'View Previous Munches') {
       setPrevMunchesSheet(true);
     }
   }
 
-  async function handleAddDish() {
-    if (Platform.OS === 'ios') {
-      Alert.prompt('Add Dish', 'Enter dish name:', async (name) => {
-        if (!name?.trim()) return;
-        try {
-          const dishId = await dishActions.addDish(id, name.trim());
-          Alert.alert('Add to...', '', [
-            { text: 'Eat-List', onPress: async () => { await dishActions.addToEatList(dishId); refreshDishes(); } },
-            { text: 'Munched', onPress: () => router.push(`/dish/${dishId}${from ? `?from=${from}` : ''}`) },
-            { text: 'Cancel', style: 'cancel' },
-          ]);
-        } catch (e) {
-          Alert.alert('Error', 'Failed to add dish');
-        }
+  function handleAddDish() {
+    setAddDishName('');
+    setAddDishModal(true);
+  }
+
+  async function submitAddDish() {
+    const name = addDishName.trim();
+    if (!name) return;
+    setAddDishModal(false);
+    setPendingDishName(name);
+    Alert.alert('Add to...', '', [
+      { text: 'Eat-List', onPress: () => setNewDishEatListSheet(true) },
+      { text: 'Munched', onPress: () => setNewDishMunchSheet(true) },
+      { text: 'Cancel', style: 'cancel', onPress: () => setPendingDishName(null) },
+    ]);
+  }
+
+  async function handleNewDishMunch(data: { rating: number; vibe_rating?: number; notes: string; log_date: string; photoUris: string[] }) {
+    if (!pendingDishName) return;
+    setActionLoading(true);
+    try {
+      const dishId = await dishActions.addDish(id, pendingDishName);
+      await dishActions.addToMunched(dishId, {
+        rating: data.rating,
+        notes: data.notes,
+        log_date: data.log_date,
+        photoUris: data.photoUris,
       });
+      refreshDishes();
+      setAutoTagDishId(dishId);
+      setNewDishMunchSheet(false);
+      setPendingDishName(null);
+      setAutoTagSheet(true);
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : 'Failed to log dish');
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleNewDishEatList(notes: string) {
+    if (!pendingDishName) return;
+    setActionLoading(true);
+    try {
+      const dishId = await dishActions.addDish(id, pendingDishName);
+      await dishActions.addToEatList(dishId, notes);
+      refreshDishes();
+      setNewDishEatListSheet(false);
+      setPendingDishName(null);
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : 'Failed to add to Eat-List');
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleAutoTagDish(newTags: string[]) {
+    if (!autoTagDishId) return;
+    try {
+      for (const tag of newTags) {
+        await tagActions.addDishTag(autoTagDishId, tag);
+      }
+    } catch (e) {
+      Alert.alert('Error', 'Failed to add tags');
+    } finally {
+      setAutoTagSheet(false);
+      setAutoTagDishId(null);
     }
   }
 
@@ -219,10 +303,10 @@ export default function RestaurantPage() {
 
   return (
     <View style={[styles.page, { paddingTop: insets.top }]}>
-      {from && (
+      {(from || status.inMunched || status.inEatList) && (
         <View style={styles.contextBanner}>
           <Text style={styles.contextBannerText}>
-            {from === 'munched' ? 'Munched' : 'Eat-List'}
+            {from === 'munched' || (!from && status.inMunched) ? 'Munched' : 'Eat-List'}
           </Text>
         </View>
       )}
@@ -247,17 +331,12 @@ export default function RestaurantPage() {
         ) : null;
       })()}
 
-      {/* Links */}
+      {/* Links row 1: Maps + Website */}
       <View style={styles.linksRow}>
         {restaurant.apple_maps_url && (
           <TouchableOpacity style={styles.linkBtn} onPress={() => Linking.openURL(restaurant.apple_maps_url!)}>
             <Ionicons name="map" size={16} color="#FF6B35" />
             <Text style={styles.linkText}>Maps</Text>
-          </TouchableOpacity>
-        )}
-        {restaurant.yelp_url && (
-          <TouchableOpacity style={styles.linkBtn} onPress={() => Linking.openURL(restaurant.yelp_url!)}>
-            <Text style={styles.linkText}>Yelp</Text>
           </TouchableOpacity>
         )}
         {restaurant.website && (
@@ -266,6 +345,22 @@ export default function RestaurantPage() {
             <Text style={styles.linkText}>Website</Text>
           </TouchableOpacity>
         )}
+      </View>
+
+      {/* Links row 2: Yelp + Infatuation */}
+      <View style={[styles.linksRow, styles.linksRowLast]}>
+        {restaurant.yelp_url && (
+          <TouchableOpacity style={styles.linkBtn} onPress={() => Linking.openURL(restaurant.yelp_url!)}>
+            <Text style={styles.linkText}>Yelp</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity
+          style={styles.infatuationBtn}
+          onPress={() => Linking.openURL(`https://www.theinfatuation.com/finder?query=${encodeURIComponent(restaurant.name)}`)}
+        >
+          <Ionicons name="megaphone" size={15} color="#FF6B35" />
+          <Text style={styles.infatuationText}>Infatuation</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Tags */}
@@ -359,6 +454,27 @@ export default function RestaurantPage() {
         ))}
       </View>
 
+      {/* Map preview */}
+      {restaurant.lat != null && restaurant.lng != null && (
+        <View style={styles.mapContainer}>
+          <MapView
+            style={styles.map}
+            initialRegion={{
+              latitude: restaurant.lat,
+              longitude: restaurant.lng,
+              latitudeDelta: 0.01,
+              longitudeDelta: 0.01,
+            }}
+            scrollEnabled={false}
+            zoomEnabled={true}
+            pitchEnabled={false}
+            rotateEnabled={false}
+          >
+            <Marker coordinate={{ latitude: restaurant.lat, longitude: restaurant.lng }} pinColor="#FF6B35" />
+          </MapView>
+        </View>
+      )}
+
       {/* Action buttons */}
       <View style={styles.actionArea}>
         {!status.inEatList && !status.inMunched && (
@@ -398,6 +514,7 @@ export default function RestaurantPage() {
         initialRating={isEditMode ? (latestLog?.rating ?? 0) : 0}
         initialVibeRating={isEditMode ? (latestLog?.vibe_rating ?? 0) : 0}
         initialNotes={isEditMode ? (latestLog?.notes ?? '') : (status.eatListEntry?.notes ?? '')}
+        initialLogDate={isEditMode ? (latestLog?.log_date ?? undefined) : undefined}
         onConfirm={isEditMode ? handleEditMunched : (status.inMunched ? handleReMunch : handleAddToMunched)}
         onClose={() => { setMunchedSheet(false); setIsEditMode(false); }}
         loading={actionLoading}
@@ -409,11 +526,63 @@ export default function RestaurantPage() {
         onAdd={handleAddTag}
         onClose={() => setTagSheet(false)}
       />
+      <Modal visible={addDishModal} transparent animationType="fade" onRequestClose={() => setAddDishModal(false)}>
+        <KeyboardAvoidingView style={dishModalStyles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <View style={dishModalStyles.box}>
+            <Text style={dishModalStyles.title}>Add Dish</Text>
+            <TextInput
+              style={dishModalStyles.input}
+              placeholder="Dish name"
+              value={addDishName}
+              onChangeText={setAddDishName}
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={submitAddDish}
+            />
+            <View style={dishModalStyles.buttons}>
+              <TouchableOpacity onPress={() => setAddDishModal(false)} style={dishModalStyles.btn}>
+                <Text style={dishModalStyles.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={submitAddDish} style={dishModalStyles.btn}>
+                <Text style={dishModalStyles.addText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+      <AddToEatListSheet
+        visible={newDishEatListSheet}
+        title="Add to Eat-List"
+        onConfirm={handleNewDishEatList}
+        onClose={() => { setNewDishEatListSheet(false); setPendingDishName(null); }}
+        loading={actionLoading}
+      />
+      <AddToMunchedSheet
+        visible={newDishMunchSheet}
+        showVibeRating={false}
+        onConfirm={handleNewDishMunch}
+        onClose={() => { setNewDishMunchSheet(false); setPendingDishName(null); }}
+        loading={actionLoading}
+        title="Log to Munched"
+      />
+      <TagPickerSheet
+        visible={autoTagSheet}
+        selectedTags={[]}
+        initialTags={tags}
+        onAdd={() => {}}
+        onDone={handleAutoTagDish}
+        onClose={() => { setAutoTagSheet(false); setAutoTagDishId(null); }}
+      />
       <PreviousMunchesSheet
         visible={prevMunchesSheet}
         logs={allLogs}
         photos={allPhotos}
         onClose={() => setPrevMunchesSheet(false)}
+        onDeleteLog={async (logId) => {
+          await actions.deleteLog(logId);
+          await refresh();
+          await loadLogsAndPhotos();
+        }}
       />
     </ScrollView>
 
@@ -456,9 +625,12 @@ const styles = StyleSheet.create({
   name: { fontSize: 24, fontWeight: '700', flex: 1, marginRight: 12 },
   address: { fontSize: 14, color: '#666', marginBottom: 4 },
   cuisine: { fontSize: 14, color: '#FF6B35', fontWeight: '500', marginBottom: 12 },
-  linksRow: { flexDirection: 'row', gap: 12, marginBottom: 20 },
+  linksRow: { flexDirection: 'row', gap: 12, marginBottom: 8 },
   linkBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#f5f5f5', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
   linkText: { fontSize: 14, color: '#FF6B35', fontWeight: '500' },
+  linksRowLast: { marginBottom: 20 },
+  infatuationBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#f5f5f5', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
+  infatuationText: { fontSize: 14, color: '#FF6B35', fontWeight: '500' },
   section: { marginBottom: 24 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   sectionTitle: { fontSize: 16, fontWeight: '600', color: '#1a1a1a', marginBottom: 8 },
@@ -475,10 +647,29 @@ const styles = StyleSheet.create({
   noteText: { fontSize: 15, color: '#333', lineHeight: 22 },
   dishRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderColor: '#f0f0f0' },
   dishName: { fontSize: 15, color: '#1a1a1a' },
+  mapContainer: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 24,
+    width: Dimensions.get('window').width - 40,
+    height: Dimensions.get('window').width - 40,
+  },
+  map: { flex: 1 },
   actionArea: { marginTop: 8 },
   buttonRow: { flexDirection: 'row', gap: 12 },
   primaryBtn: { flex: 1, backgroundColor: '#FF6B35', borderRadius: 12, padding: 16, alignItems: 'center' },
   primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   secondaryBtn: { flex: 1, backgroundColor: '#f5f5f5', borderRadius: 12, padding: 16, alignItems: 'center' },
   secondaryBtnText: { color: '#FF6B35', fontSize: 16, fontWeight: '600' },
+});
+
+const dishModalStyles = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', padding: 32 },
+  box: { backgroundColor: '#fff', borderRadius: 14, padding: 20, gap: 16 },
+  title: { fontSize: 17, fontWeight: '600', textAlign: 'center' },
+  input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 12, fontSize: 16 },
+  buttons: { flexDirection: 'row', justifyContent: 'space-between' },
+  btn: { paddingVertical: 8, paddingHorizontal: 16 },
+  cancelText: { fontSize: 16, color: '#666' },
+  addText: { fontSize: 16, color: '#FF6B35', fontWeight: '600' },
 });

@@ -160,9 +160,12 @@ export default function MapScreen() {
           </ScrollView>
         )}
 
-        {/* Tag filter */}
+        {/* Tag filter + FAB */}
         <View style={styles.tagFilterRow}>
           <TagFilter selectedTags={tagFilter} onChange={setTagFilter} />
+          <TouchableOpacity style={styles.fab} onPress={() => router.push('/search')} activeOpacity={0.85}>
+            <Text style={styles.fabIcon}>+</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Toggle */}
@@ -240,7 +243,9 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   tagFilterRow: {
-    marginHorizontal: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingRight: 16,
   },
   ratingFilterScroll: {
     flexShrink: 0,
@@ -272,6 +277,24 @@ const styles = StyleSheet.create({
   },
   ratingChipTextActive: {
     color: '#fff',
+  },
+  fab: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: BRAND_COLOR,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 6,
+  },
+  fabIcon: {
+    fontSize: 28,
+    color: '#fff',
+    lineHeight: 32,
   },
   callout: {
     minWidth: 140,

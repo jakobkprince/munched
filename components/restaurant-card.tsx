@@ -15,7 +15,7 @@ function formatDate(dateStr: string): string {
 
 export function RestaurantCard({ item }: Props) {
   const router = useRouter();
-  const { restaurant, latestLog, photos } = item;
+  const { restaurant, latestLog, photos, tags } = item;
 
   const firstPhoto = photos[0];
   const photoUrl = firstPhoto
@@ -46,6 +46,9 @@ export function RestaurantCard({ item }: Props) {
         {notesPreview ? (
           <Text style={styles.notes} numberOfLines={2}>{notesPreview}</Text>
         ) : null}
+        {tags.length > 0 && (
+          <Text style={styles.tags} numberOfLines={1}>{tags.join(' · ')}</Text>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -92,5 +95,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#555',
     lineHeight: 18,
+  },
+  tags: {
+    fontSize: 12,
+    color: '#999',
   },
 });
