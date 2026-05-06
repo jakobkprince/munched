@@ -26,8 +26,7 @@ interface DishStatus {
 
 export default function DishPage() {
   const insets = useSafeAreaInsets();
-  const { id, from, restaurantTags: restaurantTagsParam } = useLocalSearchParams<{ id: string; from?: string; restaurantTags?: string }>();
-  const restaurantTagsFromParam = restaurantTagsParam ? restaurantTagsParam.split(',').filter(Boolean) : [];
+  const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
   const actions = useDishActions();
   const restaurantActions = useRestaurantActions();
   const tagActions = useTags();
@@ -44,7 +43,6 @@ export default function DishPage() {
   const [munchedSheet, setMunchedSheet] = useState(false);
   const [eatListSheet, setEatListSheet] = useState(false);
   const [tagSheet, setTagSheet] = useState(false);
-  const [autoTagSheet, setAutoTagSheet] = useState(false);
   const [prevMunchesSheet, setPrevMunchesSheet] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
@@ -112,9 +110,6 @@ export default function DishPage() {
         photoUris: data.photoUris,
       });
       await loadDish();
-      if (!wasInEatList && restaurantTagsFromParam.length > 0) {
-        setAutoTagSheet(true);
-      }
       if (from === 'eat-list') {
         router.navigate('/(tabs)/munched/dishes');
         router.push(`/dish/${id}?from=munched`);
@@ -181,19 +176,6 @@ export default function DishPage() {
     } finally {
       setActionLoading(false);
       setMunchedSheet(false);
-    }
-  }
-
-  async function handleAutoTag(newTags: string[]) {
-    try {
-      for (const tag of newTags) {
-        await tagActions.addDishTag(id, tag);
-      }
-      await loadDish();
-    } catch (e) {
-      Alert.alert('Error', 'Failed to add tags');
-    } finally {
-      setAutoTagSheet(false);
     }
   }
 
@@ -484,14 +466,6 @@ export default function DishPage() {
         selectedTags={tags}
         onAdd={handleAddTag}
         onClose={() => setTagSheet(false)}
-      />
-      <TagPickerSheet
-        visible={autoTagSheet}
-        selectedTags={[]}
-        initialTags={restaurantTagsFromParam}
-        onAdd={() => {}}
-        onDone={handleAutoTag}
-        onClose={() => setAutoTagSheet(false)}
       />
       <AddToMunchedSheet
         visible={restaurantMunchSheet}

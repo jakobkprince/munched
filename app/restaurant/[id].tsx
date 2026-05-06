@@ -36,8 +36,6 @@ export default function RestaurantPage() {
   const [eatListSheet, setEatListSheet] = useState(false);
   const [munchedSheet, setMunchedSheet] = useState(false);
   const [tagSheet, setTagSheet] = useState(false);
-  const [autoTagDishId, setAutoTagDishId] = useState<string | null>(null);
-  const [autoTagSheet, setAutoTagSheet] = useState(false);
   const [pendingDishName, setPendingDishName] = useState<string | null>(null);
   const [newDishMunchSheet, setNewDishMunchSheet] = useState(false);
   const [addDishModal, setAddDishModal] = useState(false);
@@ -256,10 +254,8 @@ export default function RestaurantPage() {
         photoUris: data.photoUris,
       });
       refreshDishes();
-      setAutoTagDishId(dishId);
       setNewDishMunchSheet(false);
       setPendingDishName(null);
-      setAutoTagSheet(true);
     } catch (e) {
       Alert.alert('Error', e instanceof Error ? e.message : 'Failed to log dish');
     } finally {
@@ -277,20 +273,6 @@ export default function RestaurantPage() {
       Alert.alert('Error', e instanceof Error ? e.message : 'Failed to add to Eat-List');
     } finally {
       setActionLoading(false);
-    }
-  }
-
-  async function handleAutoTagDish(newTags: string[]) {
-    if (!autoTagDishId) return;
-    try {
-      for (const tag of newTags) {
-        await tagActions.addDishTag(autoTagDishId, tag);
-      }
-    } catch (e) {
-      Alert.alert('Error', 'Failed to add tags');
-    } finally {
-      setAutoTagSheet(false);
-      setAutoTagDishId(null);
     }
   }
 
@@ -552,14 +534,6 @@ export default function RestaurantPage() {
         onClose={() => { setNewDishMunchSheet(false); setPendingDishName(null); }}
         loading={actionLoading}
         title="Log to Munched"
-      />
-      <TagPickerSheet
-        visible={autoTagSheet}
-        selectedTags={[]}
-        initialTags={tags}
-        onAdd={() => {}}
-        onDone={handleAutoTagDish}
-        onClose={() => { setAutoTagSheet(false); setAutoTagDishId(null); }}
       />
       <PreviousMunchesSheet
         visible={prevMunchesSheet}
