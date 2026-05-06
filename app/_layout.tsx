@@ -1,5 +1,4 @@
 import { useEffect } from 'react';
-import { Alert } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as Updates from 'expo-updates';
 import { useAuth } from '../hooks/use-auth';
@@ -25,17 +24,13 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 }
 
 async function applyUpdateIfAvailable() {
-  if (__DEV__) return;
   try {
     const check = await Updates.checkForUpdateAsync();
-    Alert.alert('Update check', `Available: ${check.isAvailable}`);
     if (check.isAvailable) {
       await Updates.fetchUpdateAsync();
       await Updates.reloadAsync();
     }
-  } catch (e) {
-    Alert.alert('Update error', String(e));
-  }
+  } catch {}
 }
 
 export default function RootLayout() {
