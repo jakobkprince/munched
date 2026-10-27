@@ -1,15 +1,15 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, TextLayoutEvent } from 'react-native';
+import { View, Text, TextInput, StyleSheet } from 'react-native';
 
 const BULLET = '• ';
 
 /**
  * Displays saved notes, one row per line, with a hanging indent for bullets.
  *
- * On iOS 27, React Native can give a paragraph slightly less height than iOS
- * needs to draw it. iOS then doesn't wrap the last line that fits: it puts the
- * rest of the text on that line and clips it at the screen edge. Each line's
- * text therefore gets a little extra height beyond its measured lines.
+ * On the owner's iPhone (iOS 27), a long <Text> was drawn on one line and cut
+ * off at the screen edge, while the multiline TextInput in the edit sheets
+ * wrapped fine. So each line is shown in a read-only multiline TextInput,
+ * at least as tall as the content height iOS reports.
  */
 export function NoteText({ notes }: { notes: string | null }) {
   if (!notes) return null;
@@ -19,8 +19,8 @@ export function NoteText({ notes }: { notes: string | null }) {
         const bulleted = line.startsWith(BULLET);
         return (
           <View key={i} style={styles.row}>
-            {bulleted && <Text style={styles.text}>•</Text>}
-            <RoomyText>{bulleted ? line.slice(BULLET.length) : line || ' '}</RoomyText>
+            {bulleted && <Text style={[styles.text, styles.bullet]}>•</Text>}
+            <WrappedLine text={bulleted ? line.slice(BULLET.length) : line} />
           </View>
         );
       })}
@@ -28,19 +28,18 @@ export function NoteText({ notes }: { notes: string | null }) {
   );
 }
 
-function RoomyText({ children }: { children: string }) {
-  const [minHeight, setMinHeight] = useState<number>();
-
-  function handleTextLayout(e: TextLayoutEvent) {
-    const { lines } = e.nativeEvent;
-    const height = Math.ceil(lines.reduce((sum, l) => sum + l.height, 0) + 4 * lines.length);
-    if (height !== minHeight) setMinHeight(height);
-  }
-
+function WrappedLine({ text }: { text: string }) {
+  const [contentHeight, setContentHeight] = useState<number>();
   return (
-    <Text style={[styles.text, styles.body, minHeight !== undefined && { minHeight }]} onTextLayout={handleTextLayout}>
-      {children}
-    </Text>
+    <TextInput
+      value={text}
+      editable={false}
+      multiline
+      scrollEnabled={false}
+      pointerEvents="none"
+      onContentSizeChange={(e) => setContentHeight(Math.ceil(e.nativeEvent.contentSize.height))}
+      style={[styles.text, styles.line, contentHeight !== undefined && { minHeight: contentHeight }]}
+    />
   );
 }
 
@@ -48,5 +47,6 @@ const styles = StyleSheet.create({
   container: { alignSelf: 'stretch', gap: 2 },
   row: { flexDirection: 'row', gap: 6 },
   text: { fontSize: 15, color: '#333' },
-  body: { flex: 1 },
+  bullet: { lineHeight: 20 },
+  line: { flex: 1, padding: 0, paddingTop: 0, paddingBottom: 0, minHeight: 20 },
 });
