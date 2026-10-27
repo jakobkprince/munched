@@ -38,6 +38,8 @@ export default function RestaurantPage() {
   const [munchedSheet, setMunchedSheet] = useState(false);
   const [tagSheet, setTagSheet] = useState(false);
   const [pendingDishName, setPendingDishName] = useState<string | null>(null);
+  // A dish just added to the Eat-List, whose tags are being picked
+  const [tagPickDishId, setTagPickDishId] = useState<string | null>(null);
   const [newDishMunchSheet, setNewDishMunchSheet] = useState(false);
   const [addDishModal, setAddDishModal] = useState(false);
   const [addDishName, setAddDishName] = useState('');
@@ -304,10 +306,28 @@ export default function RestaurantPage() {
       const dishId = await dishActions.addDish(id, dishName);
       await dishActions.addToEatList(dishId, '');
       refreshDishes();
+      setTagPickDishId(dishId);
     } catch (e) {
       Alert.alert('Error', e instanceof Error ? e.message : 'Failed to add to Eat-List');
     } finally {
       setActionLoading(false);
+    }
+  }
+
+  // The new dish starts with the restaurant's tags (pre-selected in the picker);
+  // save whatever the user ends up choosing
+  async function handleNewDishTags(chosen: string[]) {
+    if (!tagPickDishId) return;
+    try {
+      for (const tag of chosen.filter((t) => !tags.includes(t))) {
+        await tagActions.addDishTag(tagPickDishId, tag);
+      }
+      for (const tag of tags.filter((t) => !chosen.includes(t))) {
+        await tagActions.removeDishTag(tagPickDishId, tag);
+      }
+      setTagPickDishId(null);
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : 'Failed to save tags');
     }
   }
 
@@ -538,6 +558,13 @@ export default function RestaurantPage() {
         selectedTags={tags}
         onAdd={handleAddTag}
         onClose={() => setTagSheet(false)}
+      />
+      <TagPickerSheet
+        visible={tagPickDishId !== null}
+        selectedTags={[]}
+        initialTags={tags}
+        onDone={handleNewDishTags}
+        onClose={() => setTagPickDishId(null)}
       />
       <Modal visible={addDishModal} transparent animationType="fade" onRequestClose={() => setAddDishModal(false)}>
         <KeyboardAvoidingView style={dishModalStyles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>

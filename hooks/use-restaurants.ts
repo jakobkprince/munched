@@ -102,7 +102,7 @@ export function useMunchedRestaurants(
 
       // Filter by tags
       if (tagFilter.length > 0) {
-        result = result.filter((r) => tagFilter.every((t) => r.tags.includes(t)));
+        result = result.filter((r) => tagFilter.some((t) => r.tags.includes(t)));
       }
 
       // Sort
@@ -173,7 +173,7 @@ export function useEatListRestaurants(
       setTagCounts(counts);
 
       if (tagFilter.length > 0) {
-        result = result.filter((r) => tagFilter.every((t) => r.tags.includes(t)));
+        result = result.filter((r) => tagFilter.some((t) => r.tags.includes(t)));
       }
 
       result.sort((a, b) => {

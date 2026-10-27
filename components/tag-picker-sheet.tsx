@@ -14,7 +14,7 @@ import { TAG_GROUPS } from '../constants/tags';
 interface Props {
   visible: boolean;
   selectedTags: string[];
-  onAdd: (tag: string) => void;
+  onAdd?: (tag: string) => void;
   onClose: () => void;
   // Pre-select initialTags in multi-select mode; Done calls onDone with final selection
   initialTags?: string[];
@@ -53,7 +53,7 @@ export function TagPickerSheet({ visible, selectedTags, onAdd, onClose, initialT
     if (onDone) {
       onDone(Array.from(pending));
     } else {
-      pending.forEach((tag) => onAdd(tag));
+      pending.forEach((tag) => onAdd?.(tag));
       onClose();
     }
   }
@@ -69,7 +69,6 @@ export function TagPickerSheet({ visible, selectedTags, onAdd, onClose, initialT
           placeholder="Search tags..."
           value={search}
           onChangeText={setSearch}
-          autoFocus
         />
         <ScrollView keyboardShouldPersistTaps="handled">
           {filtered.map((group) => (

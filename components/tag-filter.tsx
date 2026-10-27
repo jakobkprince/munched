@@ -17,6 +17,16 @@ interface Props {
   tagCounts?: Record<string, number>;
 }
 
+// Shown beside the sort controls once two or more tags are selected
+export function ClearTagsButton({ selectedTags, onChange }: Pick<Props, 'selectedTags' | 'onChange'>) {
+  if (selectedTags.length < 2) return null;
+  return (
+    <TouchableOpacity style={styles.clearBtn} onPress={() => onChange([])} activeOpacity={0.7}>
+      <Text style={styles.clearBtnText}>Clear tags</Text>
+    </TouchableOpacity>
+  );
+}
+
 export function TagFilter({ selectedTags, onChange, tagCounts }: Props) {
   const [modalVisible, setModalVisible] = useState(false);
   const [search, setSearch] = useState('');
@@ -207,6 +217,20 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#fff',
     fontWeight: '500',
+  },
+  clearBtn: {
+    height: 34,
+    borderRadius: 17,
+    paddingHorizontal: 12,
+    justifyContent: 'center',
+    backgroundColor: '#fff3ee',
+    borderWidth: 1,
+    borderColor: '#FF6B35',
+  },
+  clearBtnText: {
+    fontSize: 13,
+    color: '#FF6B35',
+    fontWeight: '600',
   },
   // Modal
   modalContainer: {

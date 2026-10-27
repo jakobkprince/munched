@@ -17,7 +17,8 @@ import { useMunchedRestaurants } from '../../../hooks/use-restaurants';
 import { useLocation } from '../../../hooks/use-location';
 import { RestaurantCard } from '../../../components/restaurant-card';
 import { SortPicker } from '../../../components/sort-picker';
-import { TagFilter } from '../../../components/tag-filter';
+import { TagFilter, ClearTagsButton } from '../../../components/tag-filter';
+import { useSharedTagFilter } from '../../../hooks/use-shared-tag-filter';
 import {
   SORT_FIELD_OPTIONS,
   DEFAULT_SORT_DIRECTIONS,
@@ -32,7 +33,7 @@ export default function MunchedRestaurants() {
 
   const [sortField, setSortField] = useState<MunchedRestaurantSortField>(DEFAULT_MUNCHED_RESTAURANT_SORT.field);
   const [sortDirection, setSortDirection] = useState<SortDirection>(DEFAULT_MUNCHED_RESTAURANT_SORT.direction);
-  const [tagFilter, setTagFilter] = useState<string[]>([]);
+  const [tagFilter, setTagFilter] = useSharedTagFilter();
   const [search, setSearch] = useState('');
 
   const { location } = useLocation();
@@ -127,6 +128,7 @@ export default function MunchedRestaurants() {
               color="#FF6B35"
             />
           </TouchableOpacity>
+          <ClearTagsButton selectedTags={tagFilter} onChange={setTagFilter} />
         </View>
         <View style={styles.tagFilterRow}>
           <TagFilter selectedTags={tagFilter} onChange={setTagFilter} tagCounts={tagCounts} />

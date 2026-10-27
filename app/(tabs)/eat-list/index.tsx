@@ -16,7 +16,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEatListRestaurants } from '../../../hooks/use-restaurants';
 import { useLocation } from '../../../hooks/use-location';
 import { SortPicker } from '../../../components/sort-picker';
-import { TagFilter } from '../../../components/tag-filter';
+import { TagFilter, ClearTagsButton } from '../../../components/tag-filter';
+import { useSharedTagFilter } from '../../../hooks/use-shared-tag-filter';
 import {
   SORT_FIELD_OPTIONS,
   DEFAULT_SORT_DIRECTIONS,
@@ -107,7 +108,7 @@ export default function EatListRestaurants() {
 
   const [sortField, setSortField] = useState<EatListSortField>(DEFAULT_EAT_LIST_SORT.field);
   const [sortDirection, setSortDirection] = useState<SortDirection>(DEFAULT_EAT_LIST_SORT.direction);
-  const [tagFilter, setTagFilter] = useState<string[]>([]);
+  const [tagFilter, setTagFilter] = useSharedTagFilter();
   const [search, setSearch] = useState('');
 
   const { location } = useLocation();
@@ -202,6 +203,7 @@ export default function EatListRestaurants() {
               color="#FF6B35"
             />
           </TouchableOpacity>
+          <ClearTagsButton selectedTags={tagFilter} onChange={setTagFilter} />
         </View>
         <View style={styles.tagFilterRow}>
           <TagFilter selectedTags={tagFilter} onChange={setTagFilter} tagCounts={tagCounts} />
