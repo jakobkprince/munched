@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
   detail: { padding: 20, gap: 16 },
   vibeRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   vibeLabel: { fontSize: 14, color: '#666', fontWeight: '500' },
-  notesDetail: { fontSize: 15, color: '#333', lineHeight: 22 },
+  notesDetail: { fontSize: 15, color: '#333', flexShrink: 1 },
   empty: { fontSize: 14, color: '#aaa', fontStyle: 'italic' },
   photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   photo: { width: 120, height: 120, borderRadius: 8 },

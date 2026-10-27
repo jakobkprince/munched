@@ -688,7 +688,8 @@ const styles = StyleSheet.create({
   photo: { width: 120, height: 120, borderRadius: 8 },
   noteItem: { marginBottom: 12 },
   noteDate: { fontSize: 12, color: '#999', marginBottom: 2 },
-  noteText: { fontSize: 15, color: '#333', lineHeight: 22 },
+  // No lineHeight: on a real iPhone it made long notes draw on one line, cut off
+  noteText: { fontSize: 15, color: '#333', flexShrink: 1 },
   dishRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderColor: '#f0f0f0' },
   dishInfo: { flex: 1, gap: 4 },
   dishName: { fontSize: 15, color: '#1a1a1a' },

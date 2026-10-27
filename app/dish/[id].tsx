@@ -577,7 +577,8 @@ const styles = StyleSheet.create({
   photo: { width: 120, height: 120, borderRadius: 8 },
   noteItem: { marginBottom: 12 },
   noteDate: { fontSize: 12, color: '#999', marginBottom: 2 },
-  noteText: { fontSize: 15, color: '#333', lineHeight: 22 },
+  // No lineHeight: on a real iPhone it made long notes draw on one line, cut off
+  noteText: { fontSize: 15, color: '#333', flexShrink: 1 },
   actionArea: { marginTop: 8 },
   primaryBtn: { backgroundColor: '#FF6B35', borderRadius: 12, padding: 16, alignItems: 'center' },
   primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
