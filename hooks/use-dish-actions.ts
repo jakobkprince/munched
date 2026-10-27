@@ -4,9 +4,10 @@ import { DishLogInput } from '../types';
 
 export function useDishActions() {
   async function addDish(restaurantId: string, name: string): Promise<string> {
+    const userId = await requireUserId();
     const { data, error } = await supabase
       .from('dishes')
-      .insert({ restaurant_id: restaurantId, name })
+      .insert({ restaurant_id: restaurantId, user_id: userId, name })
       .select('id')
       .single();
     if (error) throw error;

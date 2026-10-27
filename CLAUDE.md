@@ -9,6 +9,7 @@ The owner is **non-technical** and delegates every technical decision to Claude.
 - Make implementation decisions yourself; don't ask about them. Ask only about **product** behavior (what the app does or looks like) that the spec doesn't cover.
 - Work autonomously. Stop only when the owner must physically do something (log in somewhere, install a build on their phone, approve something on Apple's or Expo's site).
 - When you do need them, give numbered steps or exact copy-paste commands with no jargon, and say what they'll see when it worked.
+- **Keep it simple.** This is the owner's personal app with a single user, and it will stay that way. Choose the simplest design that works; don't build multi-user machinery (sharing, cross-user checks, admin roles). Basic per-user ownership rules are enough.
 - Verify changes yourself in the iOS Simulator before calling them done (see "Testing").
 - Do the whole release yourself (see "Shipping"). Before anything that touches the live backend (`supabase db push`, `supabase functions deploy`/`delete`), get one explicit go-ahead from the owner in chat, then do the rest. When a new build finishes, give them the install link (they open it on their iPhone and tap Install).
 
@@ -81,14 +82,14 @@ Build signing is managed by EAS (Apple team `7JGJQC5JJH`). The distribution cert
 - Handle every Supabase error explicitly: check `error` and throw or show an `Alert`. Never fail silently.
 - External APIs only via Edge Functions. Yelp, Apple Maps and Infatuation links are plain URLs built in the app.
 - Restaurants come from Google Places search, or from manual entry (stored with a `manual_…` `google_place_id`).
-- Dishes always belong to a restaurant. New dishes inherit the restaurant's tags.
+- Dishes always belong to a restaurant and to the user who entered them. New dishes inherit the restaurant's tags.
 - Match the existing UI style: light mode only, brand orange `#FF6B35`.
 
 ## Gotchas
 
 - **Log dates are date-only strings** (`2026-03-05`). `new Date("2026-03-05")` parses as UTC and shows the *previous day* in US time zones, so always format with `lib/format.ts`.
 - **Photos:** stored in the public `photos` bucket at `<log_type>/<log_id>/<file>.jpg`. Upload and delete only through `lib/photos.ts`, which downsizes images and removes the files. Deleting a log removes its photo rows (database trigger); the files must be removed by the app first, as `deleteLog`/`deleteAllLogs` already do.
-- **Access rules (RLS):** restaurants, dishes and tags are shared reference data. Eat-List entries, logs and photos are per-user. A dish can be deleted only when nobody has it in a list. It can be renamed (only the `name` column) when no *other* user has it in a list. An update or delete that RLS blocks affects 0 rows **without an error**, so add `.select()` and check that a row came back (see `renameDish`/`deleteDish`).
+- **Data ownership (RLS):** restaurants (from Google search) and restaurant tags are shared. Everything else belongs to one user: dishes (entered by hand, so each user has their own, even at the same restaurant), dish tags, Eat-List entries, logs and photos. The rule is simply `user_id = auth.uid()`. An update or delete that RLS blocks affects 0 rows **without an error**, so add `.select()` and check that a row came back (see `renameDish`/`deleteDish`).
 - **Alerts and sheets:** an `Alert` shown while a sheet (`Modal`) is closing gets dismissed along with it. Close a sheet only after its save succeeds, so errors show over the still-open sheet. To show something after a sheet closes, use the sheet's `onDismissed` (see `useDeferredAlert` and the restaurant prompt in `app/dish/[id].tsx`).
 - **SECURITY DEFINER helpers go in the `private` schema** (not `public`), so they aren't callable through the API. Run `supabase db advisors --linked` after pushing migrations: the local check misses some warnings.
 - **Keep `app.config.ts` free of environment-dependent values** (no `process.env`). It feeds the runtime fingerprint, and a value that differs between EAS Build and your machine makes OTA updates silently miss the installed build.
