@@ -28,7 +28,7 @@ export default function RestaurantPage() {
   const insets = useSafeAreaInsets();
   const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
   const { restaurant, status, tags, loading, refresh } = useRestaurant(id);
-  const { dishes, refresh: refreshDishes } = useRestaurantDishes(id);
+  const { munchedDishes, eatListDishes, refresh: refreshDishes } = useRestaurantDishes(id);
   const actions = useRestaurantActions();
   const dishActions = useDishActions();
   const tagActions = useTags();
@@ -478,11 +478,19 @@ export default function RestaurantPage() {
             <Text style={styles.addBtn}>+ Add Dish</Text>
           </TouchableOpacity>
         </View>
-        {dishes.map((dish) => (
-          <TouchableOpacity key={dish.id} style={styles.dishRow} onPress={() => router.push(`/dish/${dish.id}${from ? `?from=${from}` : ''}`)}>
-            <Text style={styles.dishName}>{dish.name}</Text>
-            <Ionicons name="chevron-forward" size={16} color="#ccc" />
-          </TouchableOpacity>
+        {[
+          { label: 'Munched', list: munchedDishes },
+          { label: 'Eat-List', list: eatListDishes },
+        ].filter((group) => group.list.length > 0).map((group) => (
+          <View key={group.label} style={styles.dishGroup}>
+            <Text style={styles.dishGroupTitle}>{group.label}</Text>
+            {group.list.map((dish) => (
+              <TouchableOpacity key={dish.id} style={styles.dishRow} onPress={() => router.push(`/dish/${dish.id}${from ? `?from=${from}` : ''}`)}>
+                <Text style={styles.dishName}>{dish.name}</Text>
+                <Ionicons name="chevron-forward" size={16} color="#ccc" />
+              </TouchableOpacity>
+            ))}
+          </View>
         ))}
       </View>
 
@@ -673,6 +681,8 @@ const styles = StyleSheet.create({
   noteText: { fontSize: 15, color: '#333', lineHeight: 22 },
   dishRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderColor: '#f0f0f0' },
   dishName: { fontSize: 15, color: '#1a1a1a' },
+  dishGroup: { marginBottom: 12 },
+  dishGroupTitle: { fontSize: 13, fontWeight: '600', color: '#888', textTransform: 'uppercase', marginTop: 4 },
   mapContainer: {
     borderRadius: 12,
     overflow: 'hidden',

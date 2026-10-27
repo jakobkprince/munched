@@ -6,7 +6,8 @@ import { distanceTo, compareDistance } from './use-location';
 import { Coordinates } from '../types';
 
 export function useRestaurantDishes(restaurantId: string) {
-  const [dishes, setDishes] = useState<Dish[]>([]);
+  const [munchedDishes, setMunchedDishes] = useState<Dish[]>([]);
+  const [eatListDishes, setEatListDishes] = useState<Dish[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetch = useCallback(async (showLoading = false) => {
@@ -21,17 +22,17 @@ export function useRestaurantDishes(restaurantId: string) {
       setLoading(false);
       return;
     }
-    const relevant = (data ?? []).filter(
-      (d) => d.eat_list_dishes.length > 0 || d.dish_logs.length > 0
-    );
-    setDishes(relevant);
+    // A dish that has been munched counts as Munched, even if it's also on the Eat-List
+    const rows = data ?? [];
+    setMunchedDishes(rows.filter((d) => d.dish_logs.length > 0));
+    setEatListDishes(rows.filter((d) => d.dish_logs.length === 0 && d.eat_list_dishes.length > 0));
     setLoading(false);
   }, [restaurantId]);
 
   const refresh = useCallback(() => fetch(false), [fetch]);
 
   useEffect(() => { fetch(true); }, [fetch]);
-  return { dishes, loading, refresh };
+  return { munchedDishes, eatListDishes, loading, refresh };
 }
 
 export function useMunchedDishes(
