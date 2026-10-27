@@ -1,15 +1,16 @@
 import { useState, useCallback, useEffect } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Alert, Image, ActionSheetIOS, Platform,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActionSheetIOS, Platform,
 } from 'react-native';
+import { Image } from 'expo-image';
+import { formatDate } from '../../lib/format';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useDishActions } from '../../hooks/use-dish-actions';
 import { useRestaurantActions } from '../../hooks/use-restaurant-actions';
 import { useTags } from '../../hooks/use-tags';
-import { usePhotos } from '../../hooks/use-photos';
+import { photoUrl } from '../../lib/photos';
 import { StarRating } from '../../components/star-rating';
 import { AddToMunchedSheet } from '../../components/add-to-munched-sheet';
 import { AddToEatListSheet } from '../../components/add-to-eat-list-sheet';
@@ -30,7 +31,6 @@ export default function DishPage() {
   const actions = useDishActions();
   const restaurantActions = useRestaurantActions();
   const tagActions = useTags();
-  const { getPublicUrl } = usePhotos();
 
   const [dish, setDish] = useState<Dish | null>(null);
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
@@ -233,6 +233,7 @@ export default function DishPage() {
         rating: data.rating,
         notes: data.notes,
         log_date: data.log_date,
+        photoUris: data.photoUris,
       });
       await loadDish();
     } catch (e) {
@@ -274,8 +275,7 @@ export default function DishPage() {
           {
             text: 'Delete', style: 'destructive', onPress: async () => {
               try {
-                const { error } = await supabase.from('dish_logs').delete().eq('dish_id', id);
-                if (error) throw error;
+                await actions.deleteAllLogs(id);
                 await loadDish();
               } catch (e) {
                 Alert.alert('Error', e instanceof Error ? e.message : 'Failed to delete');
@@ -392,7 +392,7 @@ export default function DishPage() {
                 .slice()
                 .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
                 .map((photo) => (
-                  <Image key={photo.id} source={{ uri: getPublicUrl(photo.storage_path) }} style={styles.photo} />
+                  <Image key={photo.id} source={{ uri: photoUrl(photo.storage_path) }} style={styles.photo} />
                 ))}
             </View>
           </ScrollView>
@@ -495,9 +495,6 @@ export default function DishPage() {
   );
 }
 
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
 
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: '#fff' },

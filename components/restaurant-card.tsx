@@ -1,26 +1,22 @@
-import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
+import { formatDate } from '../lib/format';
 import { useRouter } from 'expo-router';
 import { MunchedRestaurant } from '../types';
 import { StarRating } from './star-rating';
-import { supabase } from '../lib/supabase';
+import { photoUrl } from '../lib/photos';
 
 interface Props {
   item: MunchedRestaurant;
 }
 
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
 
 export function RestaurantCard({ item }: Props) {
   const router = useRouter();
   const { restaurant, latestLog, photos, tags } = item;
 
   const firstPhoto = photos[0];
-  const photoUrl = firstPhoto
-    ? supabase.storage.from('photos').getPublicUrl(firstPhoto.storage_path).data.publicUrl
-    : null;
+  const thumbnailUrl = firstPhoto ? photoUrl(firstPhoto.storage_path) : null;
 
   const notesPreview = latestLog.notes
     ? latestLog.notes.length > 80
@@ -34,8 +30,8 @@ export function RestaurantCard({ item }: Props) {
       onPress={() => router.push(`/restaurant/${restaurant.id}?from=munched` as const)}
       activeOpacity={0.75}
     >
-      {photoUrl ? (
-        <Image source={{ uri: photoUrl }} style={styles.thumbnail} />
+      {thumbnailUrl ? (
+        <Image source={{ uri: thumbnailUrl }} style={styles.thumbnail} />
       ) : (
         <View style={styles.thumbnailPlaceholder} />
       )}

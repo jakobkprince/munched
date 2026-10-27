@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, FlatList, ScrollView,
-  StyleSheet, Modal, Image, Alert,
+  View, Text, TouchableOpacity, FlatList, ScrollView, StyleSheet, Modal, Alert,
 } from 'react-native';
+import { Image } from 'expo-image';
+import { formatDate } from '../lib/format';
 import { RestaurantLog, DishLog, Photo } from '../types';
 import { StarRating } from './star-rating';
-import { usePhotos } from '../hooks/use-photos';
+import { photoUrl } from '../lib/photos';
 
 type Log = RestaurantLog | DishLog;
 
@@ -19,7 +20,6 @@ interface Props {
 
 export function PreviousMunchesSheet({ visible, logs, photos, onClose, onDeleteLog }: Props) {
   const [selectedLog, setSelectedLog] = useState<Log | null>(null);
-  const { getPublicUrl } = usePhotos();
 
   // Reset detail view whenever the sheet is closed
   useEffect(() => {
@@ -71,7 +71,7 @@ export function PreviousMunchesSheet({ visible, logs, photos, onClose, onDeleteL
                   {logPhotos.map((photo) => (
                     <Image
                       key={photo.id}
-                      source={{ uri: getPublicUrl(photo.storage_path) }}
+                      source={{ uri: photoUrl(photo.storage_path) }}
                       style={styles.photo}
                     />
                   ))}
@@ -153,9 +153,6 @@ export function PreviousMunchesSheet({ visible, logs, photos, onClose, onDeleteL
   );
 }
 
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },

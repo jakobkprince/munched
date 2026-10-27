@@ -1,9 +1,9 @@
 import { useState, useCallback, useEffect } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Linking, Alert, Image, ActionSheetIOS, Platform, Dimensions,
-  Modal, TextInput, KeyboardAvoidingView,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, Linking, Alert, ActionSheetIOS, Platform, Dimensions, Modal, TextInput, KeyboardAvoidingView,
 } from 'react-native';
+import { Image } from 'expo-image';
+import { formatDate } from '../../lib/format';
 import MapView, { Marker } from 'react-native-maps';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,7 +13,7 @@ import { useRestaurantActions } from '../../hooks/use-restaurant-actions';
 import { useRestaurantDishes } from '../../hooks/use-dishes';
 import { useDishActions } from '../../hooks/use-dish-actions';
 import { useTags } from '../../hooks/use-tags';
-import { usePhotos } from '../../hooks/use-photos';
+import { photoUrl } from '../../lib/photos';
 import { StarRating } from '../../components/star-rating';
 import { AddToEatListSheet } from '../../components/add-to-eat-list-sheet';
 import { AddToMunchedSheet } from '../../components/add-to-munched-sheet';
@@ -31,7 +31,6 @@ export default function RestaurantPage() {
   const actions = useRestaurantActions();
   const dishActions = useDishActions();
   const tagActions = useTags();
-  const { getPublicUrl } = usePhotos();
 
   const [eatListSheet, setEatListSheet] = useState(false);
   const [munchedSheet, setMunchedSheet] = useState(false);
@@ -49,14 +48,28 @@ export default function RestaurantPage() {
   // Load all logs and photos for munched view
   const loadLogsAndPhotos = useCallback(async () => {
     if (!status.inMunched) return;
-    const [logsRes, photosRes] = await Promise.all([
-      supabase.from('restaurant_logs').select('*').eq('restaurant_id', id).order('log_date', { ascending: false }).order('created_at', { ascending: false }),
-      supabase.from('photos').select('*').eq('log_type', 'restaurant_log'),
-    ]);
-    const logs = logsRes.data ?? [];
-    setAllLogs(logs);
-    const logIds = logs.map((l) => l.id);
-    setAllPhotos((photosRes.data ?? []).filter((p) => logIds.includes(p.log_id)));
+    try {
+      const { data: logs, error: logsError } = await supabase
+        .from('restaurant_logs')
+        .select('*')
+        .eq('restaurant_id', id)
+        .order('log_date', { ascending: false })
+        .order('created_at', { ascending: false });
+      if (logsError) throw logsError;
+      setAllLogs(logs ?? []);
+      const logIds = (logs ?? []).map((l) => l.id);
+      if (logIds.length === 0) { setAllPhotos([]); return; }
+      const { data: photos, error: photosError } = await supabase
+        .from('photos')
+        .select('*')
+        .eq('log_type', 'restaurant_log')
+        .in('log_id', logIds)
+        .order('created_at', { ascending: false });
+      if (photosError) throw photosError;
+      setAllPhotos(photos ?? []);
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : 'Failed to load munches');
+    }
   }, [id, status.inMunched]);
 
   useEffect(() => { loadLogsAndPhotos(); }, [loadLogsAndPhotos]);
@@ -142,6 +155,12 @@ export default function RestaurantPage() {
         { options, cancelButtonIndex: options.length - 1, destructiveButtonIndex: 1 },
         (index) => handleMenuAction(options[index])
       );
+    } else {
+      Alert.alert('Options', '', options.map((option) => ({
+        text: option,
+        style: option === 'Cancel' ? 'cancel' as const : option === 'Delete' ? 'destructive' as const : 'default' as const,
+        onPress: () => handleMenuAction(option),
+      })));
     }
   }
 
@@ -154,6 +173,7 @@ export default function RestaurantPage() {
         vibe_rating: data.vibe_rating,
         notes: data.notes,
         log_date: data.log_date,
+        photoUris: data.photoUris,
       });
       await refresh();
       await loadLogsAndPhotos();
@@ -196,8 +216,7 @@ export default function RestaurantPage() {
           {
             text: 'Delete', style: 'destructive', onPress: async () => {
               try {
-                const { error } = await supabase.from('restaurant_logs').delete().eq('restaurant_id', id);
-                if (error) throw error;
+                await actions.deleteAllLogs(id);
                 await refresh();
                 await loadLogsAndPhotos();
               } catch (e) {
@@ -387,7 +406,7 @@ export default function RestaurantPage() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.photoRow}>
               {allPhotos.map((photo) => (
-                <Image key={photo.id} source={{ uri: getPublicUrl(photo.storage_path) }} style={styles.photo} />
+                <Image key={photo.id} source={{ uri: photoUrl(photo.storage_path) }} style={styles.photo} />
               ))}
             </View>
           </ScrollView>
@@ -556,9 +575,6 @@ export default function RestaurantPage() {
   );
 }
 
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
 
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: '#fff' },

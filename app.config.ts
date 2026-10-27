@@ -4,16 +4,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: "munched",
   slug: "munched",
-  version: "1.0.0",
+  version: "1.1.0",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
   scheme: "munched",
-  userInterfaceStyle: "automatic",
-  splash: {
-    image: "./assets/images/splash-icon.png",
-    resizeMode: "contain",
-    backgroundColor: "#ffffff",
-  },
+  // The UI is designed for light mode only (hardcoded light colors).
+  userInterfaceStyle: "light",
   ios: {
     supportsTablet: true,
     bundleIdentifier: "com.jakobprince.munched",
@@ -30,24 +26,37 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
     package: "com.jakobprince.munched",
   },
-  web: {
-    bundler: "metro",
-    output: "single",
-    favicon: "./assets/images/favicon.png",
-  },
   updates: {
     url: "https://u.expo.dev/b9956388-faaa-4704-b380-c43c309bdc7e",
   },
+  // The runtime version is derived from the native code, so an OTA update is
+  // only ever delivered to builds whose native code matches it.
   runtimeVersion: {
-    policy: "appVersion",
+    policy: "fingerprint",
   },
   plugins: [
     "expo-router",
-    "expo-image-picker",
+    [
+      "expo-splash-screen",
+      {
+        image: "./assets/images/splash-icon.png",
+        imageWidth: 200,
+        resizeMode: "contain",
+        backgroundColor: "#ffffff",
+      },
+    ],
+    [
+      "expo-image-picker",
+      {
+        photosPermission: "Allow munched to access your photos so you can add them to your munches.",
+        cameraPermission: false,
+        microphonePermission: false,
+      },
+    ],
     [
       "expo-location",
       {
-        locationAlwaysAndWhenInUsePermission:
+        locationWhenInUsePermission:
           "Allow munched to use your location for distance sorting and map centering.",
       },
     ],
@@ -58,7 +67,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   extra: {
     supabaseUrl: process.env.SUPABASE_URL,
     supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
-    googlePlacesApiKey: process.env.GOOGLE_PLACES_API_KEY,
     eas: {
       projectId: "b9956388-faaa-4704-b380-c43c309bdc7e",
     },

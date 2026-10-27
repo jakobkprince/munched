@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { Restaurant, MunchedRestaurant, EatListRestaurantView, RestaurantStatus, RestaurantLog, Photo } from '../types';
 import { MunchedRestaurantSortField, EatListSortField, SortDirection } from '../constants/sort-options';
-import { getDistanceKm } from './use-location';
+import { distanceTo, compareDistance } from './use-location';
 import { Coordinates } from '../types';
 
 export function useRestaurant(id: string) {
@@ -112,12 +112,8 @@ export function useMunchedRestaurants(
           case 'rating': return dir * ((a.latestLog.rating ?? 0) - (b.latestLog.rating ?? 0));
           case 'vibe': return dir * ((a.latestLog.vibe_rating ?? 0) - (b.latestLog.vibe_rating ?? 0));
           case 'recency': return dir * (new Date(a.latestLog.log_date).getTime() - new Date(b.latestLog.log_date).getTime());
-          case 'distance': {
-            if (!userLocation || a.restaurant.lat == null || b.restaurant.lat == null) return 0;
-            const dA = getDistanceKm(userLocation, { latitude: a.restaurant.lat, longitude: a.restaurant.lng! });
-            const dB = getDistanceKm(userLocation, { latitude: b.restaurant.lat, longitude: b.restaurant.lng! });
-            return dir * (dA - dB);
-          }
+          case 'distance':
+            return compareDistance(distanceTo(userLocation, a.restaurant), distanceTo(userLocation, b.restaurant), dir);
         }
       });
 
@@ -164,9 +160,7 @@ export function useEatListRestaurants(
         entry,
         restaurant: entry.restaurant,
         tags: (tagsRes.data ?? []).filter((t) => t.restaurant_id === entry.restaurant_id).map((t) => t.tag),
-        distanceKm: userLocation && entry.restaurant.lat != null
-          ? getDistanceKm(userLocation, { latitude: entry.restaurant.lat, longitude: entry.restaurant.lng! })
-          : undefined,
+        distanceKm: distanceTo(userLocation, entry.restaurant) ?? undefined,
       }));
 
       // Compute tag counts before filtering
@@ -185,7 +179,7 @@ export function useEatListRestaurants(
       result.sort((a, b) => {
         const dir = sortDirection === 'asc' ? 1 : -1;
         if (sortField === 'recency') return dir * (new Date(a.entry.date_added).getTime() - new Date(b.entry.date_added).getTime());
-        if (sortField === 'distance' && a.distanceKm != null && b.distanceKm != null) return dir * (a.distanceKm - b.distanceKm);
+        if (sortField === 'distance') return compareDistance(a.distanceKm ?? null, b.distanceKm ?? null, dir);
         // rating/vibe not applicable to eat-list entries
         return 0;
       });

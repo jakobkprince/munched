@@ -1,11 +1,6 @@
-import { supabase } from '../lib/supabase';
+import { supabase, requireUserId } from '../lib/supabase';
+import { uploadLogPhotos, deleteLogPhotos } from '../lib/photos';
 import { DishLogInput } from '../types';
-
-async function getUserId(): Promise<string> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.user?.id) throw new Error('Not authenticated');
-  return session.user.id;
-}
 
 export function useDishActions() {
   async function addDish(restaurantId: string, name: string): Promise<string> {
@@ -16,24 +11,27 @@ export function useDishActions() {
       .single();
     if (error) throw error;
 
-    const { data: restaurantTags } = await supabase
+    // New dishes inherit the restaurant's tags
+    const { data: restaurantTags, error: tagsError } = await supabase
       .from('restaurant_tags')
       .select('tag')
       .eq('restaurant_id', restaurantId);
+    if (tagsError) throw tagsError;
     if (restaurantTags && restaurantTags.length > 0) {
-      await supabase
+      const { error: upsertError } = await supabase
         .from('dish_tags')
         .upsert(
           restaurantTags.map(({ tag }) => ({ dish_id: data.id, tag })),
           { onConflict: 'dish_id,tag', ignoreDuplicates: true }
         );
+      if (upsertError) throw upsertError;
     }
 
     return data.id;
   }
 
   async function addToEatList(dishId: string, notes?: string): Promise<void> {
-    const userId = await getUserId();
+    const userId = await requireUserId();
     const { error } = await supabase
       .from('eat_list_dishes')
       .insert({ dish_id: dishId, user_id: userId, notes: notes ?? null });
@@ -41,12 +39,13 @@ export function useDishActions() {
   }
 
   async function addToMunched(dishId: string, log: DishLogInput): Promise<void> {
-    const userId = await getUserId();
-    const { data: eatListEntry } = await supabase
+    const userId = await requireUserId();
+    const { data: eatListEntry, error: eatListError } = await supabase
       .from('eat_list_dishes')
       .select('id, notes')
       .eq('dish_id', dishId)
       .maybeSingle();
+    if (eatListError) throw eatListError;
 
     const { data: newLog, error: logError } = await supabase
       .from('dish_logs')
@@ -61,25 +60,18 @@ export function useDishActions() {
       .single();
     if (logError) throw logError;
 
-    if (log.photoUris && log.photoUris.length > 0) {
-      for (const uri of log.photoUris) {
-        const filename = `dish_log/${newLog.id}/${Date.now()}.jpg`;
-        const response = await fetch(uri);
-        const arrayBuffer = await response.arrayBuffer();
-        const { error: uploadError } = await supabase.storage.from('photos').upload(filename, arrayBuffer, { contentType: 'image/jpeg' });
-        if (uploadError) throw uploadError;
-        const { error: insertError } = await supabase.from('photos').insert({ storage_path: filename, log_type: 'dish_log', log_id: newLog.id });
-        if (insertError) throw insertError;
-      }
+    if (eatListEntry) {
+      const { error: deleteError } = await supabase.from('eat_list_dishes').delete().eq('id', eatListEntry.id);
+      if (deleteError) throw deleteError;
     }
 
-    if (eatListEntry) {
-      await supabase.from('eat_list_dishes').delete().eq('id', eatListEntry.id);
+    if (log.photoUris && log.photoUris.length > 0) {
+      await uploadLogPhotos(log.photoUris, 'dish_log', newLog.id);
     }
   }
 
   async function reMunch(dishId: string, log: DishLogInput): Promise<void> {
-    const userId = await getUserId();
+    const userId = await requireUserId();
     const { data: newLog, error } = await supabase
       .from('dish_logs')
       .insert({ dish_id: dishId, user_id: userId, rating: log.rating, notes: log.notes ?? null, log_date: log.log_date })
@@ -88,21 +80,14 @@ export function useDishActions() {
     if (error) throw error;
 
     if (log.photoUris && log.photoUris.length > 0) {
-      for (const uri of log.photoUris) {
-        const filename = `dish_log/${newLog.id}/${Date.now()}.jpg`;
-        const response = await fetch(uri);
-        const arrayBuffer = await response.arrayBuffer();
-        const { error: uploadError } = await supabase.storage.from('photos').upload(filename, arrayBuffer, { contentType: 'image/jpeg' });
-        if (uploadError) throw uploadError;
-        const { error: insertError } = await supabase.from('photos').insert({ storage_path: filename, log_type: 'dish_log', log_id: newLog.id });
-        if (insertError) throw insertError;
-      }
+      await uploadLogPhotos(log.photoUris, 'dish_log', newLog.id);
     }
   }
 
   async function deleteDish(dishId: string): Promise<void> {
-    const { error } = await supabase.from('dishes').delete().eq('id', dishId);
+    const { data, error } = await supabase.from('dishes').delete().eq('id', dishId).select('id');
     if (error) throw error;
+    if (!data || data.length === 0) throw new Error('This dish could not be deleted.');
   }
 
   async function deleteFromEatList(id: string): Promise<void> {
@@ -111,7 +96,16 @@ export function useDishActions() {
   }
 
   async function deleteLog(logId: string): Promise<void> {
+    await deleteLogPhotos('dish_log', [logId]);
     const { error } = await supabase.from('dish_logs').delete().eq('id', logId);
+    if (error) throw error;
+  }
+
+  async function deleteAllLogs(dishId: string): Promise<void> {
+    const { data: logs, error: selectError } = await supabase.from('dish_logs').select('id').eq('dish_id', dishId);
+    if (selectError) throw selectError;
+    await deleteLogPhotos('dish_log', (logs ?? []).map((l) => l.id));
+    const { error } = await supabase.from('dish_logs').delete().eq('dish_id', dishId);
     if (error) throw error;
   }
 
@@ -130,7 +124,11 @@ export function useDishActions() {
       })
       .eq('id', logId);
     if (error) throw error;
+
+    if (updates.photoUris && updates.photoUris.length > 0) {
+      await uploadLogPhotos(updates.photoUris, 'dish_log', logId);
+    }
   }
 
-  return { addDish, addToEatList, addToMunched, reMunch, deleteDish, deleteFromEatList, deleteLog, editEatListEntry, editDishLog };
+  return { addDish, addToEatList, addToMunched, reMunch, deleteDish, deleteFromEatList, deleteLog, deleteAllLogs, editEatListEntry, editDishLog };
 }

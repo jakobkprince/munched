@@ -1,4 +1,6 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+// Restaurant search via Google Places Text Search (New).
+// Keeps the Google API key on the server. Only signed-in app users may call it.
+import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,18 +17,39 @@ interface PlaceResult {
   types: string[];
 }
 
-serve(async (req: Request) => {
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
+const supabase = createClient(
+  Deno.env.get('SUPABASE_URL')!,
+  Deno.env.get('SUPABASE_ANON_KEY')!,
+);
+
+async function isSignedIn(req: Request): Promise<boolean> {
+  const token = req.headers.get('Authorization')?.replace(/^Bearer /, '');
+  if (!token) return false;
+  const { data, error } = await supabase.auth.getUser(token);
+  return !error && !!data.user;
+}
+
+Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
+    if (!(await isSignedIn(req))) {
+      return json({ error: 'Please sign in to search.' }, 401);
+    }
+
     const { textQuery, latitude, longitude } = await req.json();
 
     if (!textQuery || textQuery.trim().length === 0) {
-      return new Response(JSON.stringify({ places: [] }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return json({ places: [] });
     }
 
     const apiKey = Deno.env.get('GOOGLE_PLACES_API_KEY');
@@ -82,13 +105,9 @@ serve(async (req: Request) => {
       types: p.types ?? [],
     }));
 
-    return new Response(JSON.stringify({ places }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return json({ places });
   } catch (error) {
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    console.error(error);
+    return json({ error: error instanceof Error ? error.message : 'Unknown error' }, 500);
   }
 });

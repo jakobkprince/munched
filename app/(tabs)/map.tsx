@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,7 @@ import {
   ScrollView,
 } from 'react-native';
 import MapView, { Marker, Callout } from 'react-native-maps';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useLocation } from '@/hooks/use-location';
 import { useMunchedRestaurants } from '@/hooks/use-restaurants';
 import { useEatListRestaurants } from '@/hooks/use-restaurants';
@@ -39,19 +39,25 @@ export default function MapScreen() {
   const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [ratingFilter, setRatingFilter] = useState<RatingFilter>('all');
 
-  const { data: munchedData } = useMunchedRestaurants(
+  const { data: munchedData, refresh: refreshMunched } = useMunchedRestaurants(
     'recency',
     'desc',
     tagFilter,
     null
   );
 
-  const { data: eatListData } = useEatListRestaurants(
+  const { data: eatListData, refresh: refreshEatList } = useEatListRestaurants(
     'recency',
     'desc',
     tagFilter,
     null
   );
+
+  // Pick up restaurants added or logged elsewhere in the app
+  useFocusEffect(useCallback(() => {
+    refreshMunched();
+    refreshEatList();
+  }, [refreshMunched, refreshEatList]));
 
   const mapRegion = useMemo(() => {
     const center = location ?? DEFAULT_LOCATION;

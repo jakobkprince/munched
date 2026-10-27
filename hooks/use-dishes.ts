@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { Dish, MunchedDish, EatListDishView, Restaurant, DishLog } from '../types';
 import { MunchedDishSortField, EatListSortField, SortDirection } from '../constants/sort-options';
-import { getDistanceKm } from './use-location';
+import { distanceTo, compareDistance } from './use-location';
 import { Coordinates } from '../types';
 
 export function useRestaurantDishes(restaurantId: string) {
@@ -11,11 +11,16 @@ export function useRestaurantDishes(restaurantId: string) {
 
   const fetch = useCallback(async (showLoading = false) => {
     if (showLoading) setLoading(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('dishes')
       .select('*, eat_list_dishes(id), dish_logs(id)')
       .eq('restaurant_id', restaurantId)
       .order('name');
+    if (error) {
+      console.error('Failed to load dishes:', error);
+      setLoading(false);
+      return;
+    }
     const relevant = (data ?? []).filter(
       (d) => d.eat_list_dishes.length > 0 || d.dish_logs.length > 0
     );
@@ -23,8 +28,10 @@ export function useRestaurantDishes(restaurantId: string) {
     setLoading(false);
   }, [restaurantId]);
 
+  const refresh = useCallback(() => fetch(false), [fetch]);
+
   useEffect(() => { fetch(true); }, [fetch]);
-  return { dishes, loading, refresh: () => fetch(false) };
+  return { dishes, loading, refresh };
 }
 
 export function useMunchedDishes(
@@ -94,12 +101,8 @@ export function useMunchedDishes(
         switch (sortField) {
           case 'rating': return dir * ((a.latestLog.rating ?? 0) - (b.latestLog.rating ?? 0));
           case 'recency': return dir * (new Date(a.latestLog.log_date).getTime() - new Date(b.latestLog.log_date).getTime());
-          case 'distance': {
-            if (!userLocation || a.restaurant.lat == null || b.restaurant.lat == null) return 0;
-            const dA = getDistanceKm(userLocation, { latitude: a.restaurant.lat, longitude: a.restaurant.lng! });
-            const dB = getDistanceKm(userLocation, { latitude: b.restaurant.lat, longitude: b.restaurant.lng! });
-            return dir * (dA - dB);
-          }
+          case 'distance':
+            return compareDistance(distanceTo(userLocation, a.restaurant), distanceTo(userLocation, b.restaurant), dir);
         }
       });
 
@@ -164,11 +167,7 @@ export function useEatListDishes(
       result.sort((a, b) => {
         const dir = sortDirection === 'asc' ? 1 : -1;
         if (sortField === 'recency') return dir * (new Date(a.entry.date_added).getTime() - new Date(b.entry.date_added).getTime());
-        if (sortField === 'distance' && userLocation && a.restaurant.lat != null && b.restaurant.lat != null) {
-          const dA = getDistanceKm(userLocation, { latitude: a.restaurant.lat, longitude: a.restaurant.lng! });
-          const dB = getDistanceKm(userLocation, { latitude: b.restaurant.lat, longitude: b.restaurant.lng! });
-          return dir * (dA - dB);
-        }
+        if (sortField === 'distance') return compareDistance(distanceTo(userLocation, a.restaurant), distanceTo(userLocation, b.restaurant), dir);
         // rating/vibe not applicable to eat-list entries
         return 0;
       });

@@ -40,10 +40,10 @@ App for logging/rating restaurants and specific dishes you've tried (**Munched**
 
 ### Restaurants
 
-- Added via **search** (not manual entry) — user types a restaurant name, taps Search, and selects from the results list
+- Added via **search** — user types a restaurant name, taps Search, and selects from the results list. If it isn't found, it can be **added manually** (name + optional address)
 - Populated automatically with: name, address, coordinates, website, Yelp link, Apple Maps link
 - Can be tagged with one or more cuisine/category tags
-- Rated 1–5 stars (overall) + 1–5 stars (vibe)
+- Rated 1–5 stars (overall) + 1–5 stars (vibe), half stars allowed
 - Can include notes, pictures, and a log date
 - Can be re-logged (re-munched) over time; new log takes precedence but full log history is viewable
 - Restaurant pages are always accessible as standalone references (populated from Google Places data) even if removed from a list
@@ -53,7 +53,7 @@ App for logging/rating restaurants and specific dishes you've tried (**Munched**
 - Belong to a restaurant (navigable in both directions — dish → restaurant, restaurant → dish list)
 - Can only be added through the restaurant page they belong to
 - Can be tagged with one or more cuisine/category tags
-- Rated 1–5 stars
+- Rated 1–5 stars, half stars allowed
 - Can include notes, pictures, and a log date
 - Can be re-logged (re-munched) over time; new log takes precedence but full log history is viewable
 

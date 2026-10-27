@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type ComponentRef } from 'react';
 import {
-  View, Text, TouchableOpacity, ScrollView,
-  StyleSheet, Modal, KeyboardAvoidingView, Platform, Image, Alert,
+  View, Text, TouchableOpacity, ScrollView, StyleSheet, Modal, KeyboardAvoidingView, Platform, Alert,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { BulletTextInput } from './bullet-text-input';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
@@ -39,7 +39,7 @@ interface ScrollPickerProps {
 }
 
 function ScrollPicker({ items, selectedIndex, onSelect }: ScrollPickerProps) {
-  const ref = useRef<ScrollView>(null);
+  const ref = useRef<ComponentRef<typeof ScrollView>>(null);
   const currentIndex = useRef(selectedIndex);
 
   useEffect(() => {
@@ -178,7 +178,7 @@ export function AddToMunchedSheet({ visible, showVibeRating = true, initialRatin
 
   async function pickPhoto() {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsMultipleSelection: true,
       quality: 0.8,
     });

@@ -1,12 +1,7 @@
-import { supabase } from '../lib/supabase';
+import { supabase, requireUserId } from '../lib/supabase';
+import { uploadLogPhotos, deleteLogPhotos } from '../lib/photos';
 import { Restaurant, RestaurantLogInput } from '../types';
 import { PLACES_TYPE_TO_TAG } from '../constants/tags';
-
-async function getUserId(): Promise<string> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.user?.id) throw new Error('Not authenticated');
-  return session.user.id;
-}
 
 export function useRestaurantActions() {
   async function upsertRestaurant(restaurant: Omit<Restaurant, 'id' | 'created_at'>): Promise<string> {
@@ -32,7 +27,7 @@ export function useRestaurantActions() {
   }
 
   async function addToEatList(restaurantId: string, notes?: string): Promise<void> {
-    const userId = await getUserId();
+    const userId = await requireUserId();
     const { error } = await supabase
       .from('eat_list_restaurants')
       .insert({ restaurant_id: restaurantId, user_id: userId, notes: notes ?? null });
@@ -40,15 +35,15 @@ export function useRestaurantActions() {
   }
 
   async function addToMunched(restaurantId: string, log: RestaurantLogInput): Promise<void> {
-    const userId = await getUserId();
-    // Check if eat-list entry exists — if so, carry over notes + tags, then delete it
-    const { data: eatListEntry } = await supabase
+    const userId = await requireUserId();
+    // Check if eat-list entry exists — if so, carry over notes, then delete it
+    const { data: eatListEntry, error: eatListError } = await supabase
       .from('eat_list_restaurants')
       .select('id, notes')
       .eq('restaurant_id', restaurantId)
       .maybeSingle();
+    if (eatListError) throw eatListError;
 
-    // Insert the log
     const { data: newLog, error: logError } = await supabase
       .from('restaurant_logs')
       .insert({
@@ -63,12 +58,6 @@ export function useRestaurantActions() {
       .single();
     if (logError) throw logError;
 
-    // Upload photos if any
-    if (log.photoUris && log.photoUris.length > 0) {
-      await uploadPhotos(log.photoUris, 'restaurant_log', newLog.id);
-    }
-
-    // Remove from eat-list if present
     if (eatListEntry) {
       const { error: deleteError } = await supabase
         .from('eat_list_restaurants')
@@ -76,10 +65,14 @@ export function useRestaurantActions() {
         .eq('id', eatListEntry.id);
       if (deleteError) throw deleteError;
     }
+
+    if (log.photoUris && log.photoUris.length > 0) {
+      await uploadLogPhotos(log.photoUris, 'restaurant_log', newLog.id);
+    }
   }
 
   async function reMunch(restaurantId: string, log: RestaurantLogInput): Promise<void> {
-    const userId = await getUserId();
+    const userId = await requireUserId();
     const { data: newLog, error } = await supabase
       .from('restaurant_logs')
       .insert({
@@ -95,7 +88,7 @@ export function useRestaurantActions() {
     if (error) throw error;
 
     if (log.photoUris && log.photoUris.length > 0) {
-      await uploadPhotos(log.photoUris, 'restaurant_log', newLog.id);
+      await uploadLogPhotos(log.photoUris, 'restaurant_log', newLog.id);
     }
   }
 
@@ -108,10 +101,25 @@ export function useRestaurantActions() {
   }
 
   async function deleteLog(logId: string): Promise<void> {
+    await deleteLogPhotos('restaurant_log', [logId]);
     const { error } = await supabase
       .from('restaurant_logs')
       .delete()
       .eq('id', logId);
+    if (error) throw error;
+  }
+
+  async function deleteAllLogs(restaurantId: string): Promise<void> {
+    const { data: logs, error: selectError } = await supabase
+      .from('restaurant_logs')
+      .select('id')
+      .eq('restaurant_id', restaurantId);
+    if (selectError) throw selectError;
+    await deleteLogPhotos('restaurant_log', (logs ?? []).map((l) => l.id));
+    const { error } = await supabase
+      .from('restaurant_logs')
+      .delete()
+      .eq('restaurant_id', restaurantId);
     if (error) throw error;
   }
 
@@ -134,6 +142,10 @@ export function useRestaurantActions() {
       })
       .eq('id', logId);
     if (error) throw error;
+
+    if (updates.photoUris && updates.photoUris.length > 0) {
+      await uploadLogPhotos(updates.photoUris, 'restaurant_log', logId);
+    }
   }
 
   async function autoSuggestTags(restaurantId: string, placeTypes: string[]): Promise<void> {
@@ -142,9 +154,10 @@ export function useRestaurantActions() {
       .filter((t): t is string => !!t);
     const unique = [...new Set(suggestedTags)];
     if (unique.length === 0) return;
-    await supabase
+    const { error } = await supabase
       .from('restaurant_tags')
       .upsert(unique.map((tag) => ({ restaurant_id: restaurantId, tag })), { onConflict: 'restaurant_id,tag', ignoreDuplicates: true });
+    if (error) throw error;
   }
 
   return {
@@ -154,22 +167,9 @@ export function useRestaurantActions() {
     reMunch,
     deleteFromEatList,
     deleteLog,
+    deleteAllLogs,
     editEatListEntry,
     editRestaurantLog,
     autoSuggestTags,
   };
-}
-
-async function uploadPhotos(uris: string[], logType: 'restaurant_log' | 'dish_log', logId: string): Promise<void> {
-  for (const uri of uris) {
-    const filename = `${logType}/${logId}/${Date.now()}.jpg`;
-    const response = await fetch(uri);
-    const arrayBuffer = await response.arrayBuffer();
-    const { error: uploadError } = await supabase.storage.from('photos').upload(filename, arrayBuffer, { contentType: 'image/jpeg' });
-    if (uploadError) throw uploadError;
-    const { error: insertError } = await supabase
-      .from('photos')
-      .insert({ storage_path: filename, log_type: logType, log_id: logId });
-    if (insertError) throw insertError;
-  }
 }

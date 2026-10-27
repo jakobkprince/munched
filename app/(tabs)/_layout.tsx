@@ -14,7 +14,7 @@ export default function TabLayout() {
         options={{
           title: 'Eat-List',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="list" size={size} color={color} />
+            <Ionicons name="list" size={size} color={color as string} />
           ),
         }}
       />
@@ -23,7 +23,7 @@ export default function TabLayout() {
         options={{
           title: 'Map',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="map" size={size} color={color} />
+            <Ionicons name="map" size={size} color={color as string} />
           ),
         }}
       />
@@ -32,7 +32,7 @@ export default function TabLayout() {
         options={{
           title: 'Munched',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="restaurant" size={size} color={color} />
+            <Ionicons name="restaurant" size={size} color={color as string} />
           ),
         }}
       />
