@@ -72,6 +72,8 @@ The phone runs an internal-distribution ("preview") build. Commit everything bef
    - **Native change** (new native package, `app.config.ts` plugins/permissions/icons, Expo SDK upgrade): the runtime fingerprint changes, so an update won't reach the old build. Run `eas build --profile preview --platform ios --non-interactive --no-wait`, then send the owner the install link from the build page. `eas update` warns when no build matches the current fingerprint; treat that warning as "a new build is needed".
 3. Merge to `main` and push.
 
+Build signing is managed by EAS (Apple team `7JGJQC5JJH`). The distribution certificate and ad hoc provisioning profile **expire 2027-04-08**; one registered device (the owner's iPhone). Renewing, or adding a device (`eas device:create`), needs the owner's Apple login, so walk them through it step by step.
+
 ## Coding conventions
 
 - Functional components + hooks; styles colocated via `StyleSheet.create`; kebab-case file names; PascalCase types.
@@ -86,5 +88,6 @@ The phone runs an internal-distribution ("preview") build. Commit everything bef
 - **Log dates are date-only strings** (`2026-03-05`). `new Date("2026-03-05")` parses as UTC and shows the *previous day* in US time zones, so always format with `lib/format.ts`.
 - **Photos:** stored in the public `photos` bucket at `<log_type>/<log_id>/<file>.jpg`. Upload and delete only through `lib/photos.ts`, which downsizes images and removes the files. Deleting a log removes its photo rows (database trigger); the files must be removed by the app first, as `deleteLog`/`deleteAllLogs` already do.
 - **Access rules (RLS):** restaurants, dishes and tags are shared reference data. Eat-List entries, logs and photos are per-user. A dish can be deleted only when nobody has it in a list.
+- **SECURITY DEFINER helpers go in the `private` schema** (not `public`), so they aren't callable through the API. Run `supabase db advisors --linked` after pushing migrations: the local check misses some warnings.
 - **`useFocusEffect` callbacks must be stable.** Wrap refresh functions in `useCallback`, or the screen refetches in a loop.
 - The `restaurants` table has no UPDATE rule: insert first, and on a duplicate-key conflict select the existing row (see `upsertRestaurant`).
