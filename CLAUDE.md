@@ -47,7 +47,7 @@ scripts/start-local.sh  Runs the app against the local database
 | Check the database for security/performance issues | `supabase db advisors --local` (or `--linked`) |
 | Read-only query of the real database | `supabase db query --linked "select ..."` |
 
-`.env` (gitignored) holds `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `GOOGLE_PLACES_API_KEY`. See `.env.example`.
+`.env` (gitignored) is only needed for `GOOGLE_PLACES_API_KEY`, which the local search function uses. The app's Supabase URL and anon key are public by design and live directly in `app.config.ts` (`extra`). `npm run start:local` overrides them through `EXPO_PUBLIC_SUPABASE_*`.
 
 ## Testing
 
@@ -69,7 +69,7 @@ The phone runs an internal-distribution ("preview") build. Commit everything bef
    - Migrations: `supabase db push`
    - Function: `supabase functions deploy places-text-search` (JWT settings come from `supabase/config.toml`)
 2. **App changes:**
-   - **JavaScript/TypeScript-only change** (the usual case): `eas update --channel preview --environment preview --platform ios --message "<what changed>"`. The phone picks it up the next time the app opens: it checks, downloads and reloads.
+   - **JavaScript/TypeScript-only change** (the usual case): `eas update --channel preview --environment preview --platform ios --message "<what changed>" --non-interactive`. The phone picks it up the next time the app opens: it checks, downloads and reloads. **Then confirm that the "Runtime version" it prints equals the installed build's** (`eas build:list --platform ios --limit 1 --json` gives the build id; `eas build:view <id> --json` → `runtime.version`). If they differ, the phone silently ignores the update.
    - **Native change** (new native package, `app.config.ts` plugins/permissions/icons, Expo SDK upgrade): the runtime fingerprint changes, so an update won't reach the old build. Run `eas build --profile preview --platform ios --non-interactive --no-wait`, then send the owner the install link from the build page. `eas update` warns when no build matches the current fingerprint; treat that warning as "a new build is needed".
 3. Merge to `main` and push.
 
@@ -90,5 +90,6 @@ Build signing is managed by EAS (Apple team `7JGJQC5JJH`). The distribution cert
 - **Photos:** stored in the public `photos` bucket at `<log_type>/<log_id>/<file>.jpg`. Upload and delete only through `lib/photos.ts`, which downsizes images and removes the files. Deleting a log removes its photo rows (database trigger); the files must be removed by the app first, as `deleteLog`/`deleteAllLogs` already do.
 - **Access rules (RLS):** restaurants, dishes and tags are shared reference data. Eat-List entries, logs and photos are per-user. A dish can be deleted only when nobody has it in a list.
 - **SECURITY DEFINER helpers go in the `private` schema** (not `public`), so they aren't callable through the API. Run `supabase db advisors --linked` after pushing migrations: the local check misses some warnings.
+- **Keep `app.config.ts` free of environment-dependent values** (no `process.env`). It feeds the runtime fingerprint, and a value that differs between EAS Build and your machine makes OTA updates silently miss the installed build.
 - **`useFocusEffect` callbacks must be stable.** Wrap refresh functions in `useCallback`, or the screen refetches in a loop.
 - The `restaurants` table has no UPDATE rule: insert first, and on a duplicate-key conflict select the existing row (see `upsertRestaurant`).

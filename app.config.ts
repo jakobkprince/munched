@@ -64,9 +64,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   experiments: {
     typedRoutes: true,
   },
+  // Everything in this file feeds the runtime fingerprint, so keep it free of
+  // environment-dependent values: a mismatch stops OTA updates reaching builds.
+  // The Supabase URL and anon key are public by design (row-level security
+  // protects the data). `npm run start:local` overrides them at runtime.
   extra: {
-    supabaseUrl: process.env.SUPABASE_URL,
-    supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
+    supabaseUrl: "https://dvguczmgurehwyarhboj.supabase.co",
+    supabaseAnonKey:
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2Z3Vjem1ndXJlaHd5YXJoYm9qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxMDYwOTgsImV4cCI6MjA4OTY4MjA5OH0.5JY2m2cKdWL3CYIXSTLbU5k4QxmxHib2_YF28ibeIG0",
     eas: {
       projectId: "b9956388-faaa-4704-b380-c43c309bdc7e",
     },

@@ -5,10 +5,10 @@
 set -e
 cd "$(dirname "$0")/.."
 
-# Load the Google key etc. from .env so the local search function can use it
+# Load the Google key from .env so the local search function can use it
 set -a; . ./.env; set +a
 
 supabase start >/dev/null
 eval "$(supabase status -o env | grep -E '^(API_URL|ANON_KEY)=')"
 
-SUPABASE_URL="$API_URL" SUPABASE_ANON_KEY="$ANON_KEY" exec npx expo start "$@"
+EXPO_PUBLIC_SUPABASE_URL="$API_URL" EXPO_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY" exec npx expo start "$@"
