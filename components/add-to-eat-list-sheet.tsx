@@ -1,28 +1,39 @@
 import { useState, useEffect } from 'react';
 import {
-  View, Text, TouchableOpacity,
-  StyleSheet, Modal, KeyboardAvoidingView, Platform,
+  View, Text, TouchableOpacity, TextInput,
+  StyleSheet, Modal, KeyboardAvoidingView, Platform, Alert,
 } from 'react-native';
 import { BulletTextInput } from './bullet-text-input';
 
 interface Props {
   visible: boolean;
   initialNotes?: string;
+  /** When set, shows an editable Name field (used when editing a dish). */
+  initialName?: string;
   title?: string;
-  onConfirm: (notes: string) => void;
+  onConfirm: (notes: string, name?: string) => void;
   onClose: () => void;
   loading?: boolean;
 }
 
-export function AddToEatListSheet({ visible, initialNotes = '', title = 'Add to Eat-List', onConfirm, onClose, loading }: Props) {
+export function AddToEatListSheet({ visible, initialNotes = '', initialName, title = 'Add to Eat-List', onConfirm, onClose, loading }: Props) {
   const [notes, setNotes] = useState(initialNotes);
+  const [name, setName] = useState(initialName ?? '');
+  const showName = initialName !== undefined;
 
   useEffect(() => {
-    if (visible) setNotes(initialNotes);
+    if (visible) {
+      setNotes(initialNotes);
+      setName(initialName ?? '');
+    }
   }, [visible]);
 
   function handleConfirm() {
-    onConfirm(notes);
+    if (showName && !name.trim()) {
+      Alert.alert('Name required', 'Please enter a dish name.');
+      return;
+    }
+    onConfirm(notes, showName ? name.trim() : undefined);
   }
 
   return (
@@ -33,6 +44,20 @@ export function AddToEatListSheet({ visible, initialNotes = '', title = 'Add to 
         </View>
         <View style={styles.body}>
           <View style={styles.notesBottom}>
+          {showName && (
+            <>
+              <Text style={styles.label}>Name</Text>
+              <TextInput
+                style={styles.nameInput}
+                value={name}
+                onChangeText={setName}
+                placeholder="Dish name"
+                autoCorrect={false}
+                autoCapitalize="words"
+                returnKeyType="done"
+              />
+            </>
+          )}
           <Text style={styles.label}>Notes</Text>
           <BulletTextInput
             style={styles.input}
@@ -67,6 +92,7 @@ const styles = StyleSheet.create({
   notesBottom: {},
   label: { fontSize: 14, fontWeight: '500', color: '#444', marginBottom: 8 },
   input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 12, fontSize: 15, minHeight: 100 },
+  nameInput: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 12, fontSize: 15, marginBottom: 20 },
   footer: { flexDirection: 'row', gap: 12, padding: 16, borderTopWidth: 1, borderColor: '#eee', paddingBottom: 32 },
   cancelBtn: { flex: 1, borderRadius: 12, padding: 16, alignItems: 'center', backgroundColor: '#f5f5f5' },
   cancelText: { fontSize: 16, fontWeight: '600', color: '#666' },

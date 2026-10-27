@@ -13,7 +13,8 @@ import { useRestaurantActions } from '../../hooks/use-restaurant-actions';
 import { useRestaurantDishes } from '../../hooks/use-dishes';
 import { useDishActions } from '../../hooks/use-dish-actions';
 import { useTags } from '../../hooks/use-tags';
-import { photoUrl } from '../../lib/photos';
+import { photoUrl, PhotoUploadError } from '../../lib/photos';
+import { useDeferredAlert } from '../../hooks/use-deferred-alert';
 import { StarRating } from '../../components/star-rating';
 import { AddToEatListSheet } from '../../components/add-to-eat-list-sheet';
 import { AddToMunchedSheet } from '../../components/add-to-munched-sheet';
@@ -31,6 +32,7 @@ export default function RestaurantPage() {
   const actions = useRestaurantActions();
   const dishActions = useDishActions();
   const tagActions = useTags();
+  const deferredAlert = useDeferredAlert();
 
   const [eatListSheet, setEatListSheet] = useState(false);
   const [munchedSheet, setMunchedSheet] = useState(false);
@@ -81,16 +83,30 @@ export default function RestaurantPage() {
 
   const latestLog = allLogs[0];
 
+  // A failed photo upload happens after the munch itself is saved: close the
+  // sheet (so Save can't create a duplicate) and show the message once it's gone.
+  function showSaveError(e: unknown, fallback: string, closeSheet: () => void) {
+    if (e instanceof PhotoUploadError) {
+      deferredAlert.defer('Photo not uploaded', e.message);
+      closeSheet();
+      refresh();
+      loadLogsAndPhotos();
+      refreshDishes();
+      return;
+    }
+    Alert.alert('Error', e instanceof Error ? e.message : fallback);
+  }
+
   async function handleAddToEatList(notes: string) {
     setActionLoading(true);
     try {
       await actions.addToEatList(id, notes);
       await refresh();
+      setEatListSheet(false);
     } catch (e) {
       Alert.alert('Error', e instanceof Error ? e.message : 'Failed to add');
     } finally {
       setActionLoading(false);
-      setEatListSheet(false);
     }
   }
 
@@ -105,11 +121,11 @@ export default function RestaurantPage() {
         await refresh();
         await loadLogsAndPhotos();
       }
+      setMunchedSheet(false);
     } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Failed to log');
+      showSaveError(e, 'Failed to log', () => setMunchedSheet(false));
     } finally {
       setActionLoading(false);
-      setMunchedSheet(false);
     }
   }
 
@@ -119,11 +135,11 @@ export default function RestaurantPage() {
       await actions.reMunch(id, { rating: data.rating, vibe_rating: data.vibe_rating, notes: data.notes, log_date: data.log_date, photoUris: data.photoUris });
       await refresh();
       await loadLogsAndPhotos();
+      setMunchedSheet(false);
     } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Failed to re-munch');
+      showSaveError(e, 'Failed to re-munch', () => setMunchedSheet(false));
     } finally {
       setActionLoading(false);
-      setMunchedSheet(false);
     }
   }
 
@@ -177,12 +193,12 @@ export default function RestaurantPage() {
       });
       await refresh();
       await loadLogsAndPhotos();
-    } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Failed to edit');
-    } finally {
-      setActionLoading(false);
       setMunchedSheet(false);
       setIsEditMode(false);
+    } catch (e) {
+      showSaveError(e, 'Failed to edit', () => { setMunchedSheet(false); setIsEditMode(false); });
+    } finally {
+      setActionLoading(false);
     }
   }
 
@@ -192,12 +208,12 @@ export default function RestaurantPage() {
     try {
       await actions.editEatListEntry(status.eatListEntry.id, notes);
       await refresh();
+      setEatListSheet(false);
+      setIsEditMode(false);
     } catch (e) {
       Alert.alert('Error', e instanceof Error ? e.message : 'Failed to edit');
     } finally {
       setActionLoading(false);
-      setEatListSheet(false);
-      setIsEditMode(false);
     }
   }
 
@@ -276,7 +292,7 @@ export default function RestaurantPage() {
       setNewDishMunchSheet(false);
       setPendingDishName(null);
     } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Failed to log dish');
+      showSaveError(e, 'Failed to log dish', () => { setNewDishMunchSheet(false); setPendingDishName(null); });
     } finally {
       setActionLoading(false);
     }
@@ -513,6 +529,7 @@ export default function RestaurantPage() {
         initialLogDate={isEditMode ? (latestLog?.log_date ?? undefined) : undefined}
         onConfirm={isEditMode ? handleEditMunched : (status.inMunched ? handleReMunch : handleAddToMunched)}
         onClose={() => { setMunchedSheet(false); setIsEditMode(false); }}
+        onDismissed={deferredAlert.flush}
         loading={actionLoading}
         title={isEditMode ? 'Edit Munch' : (status.inMunched ? 'Re-Munch' : 'Log to Munched')}
       />
@@ -532,6 +549,8 @@ export default function RestaurantPage() {
               value={addDishName}
               onChangeText={setAddDishName}
               autoFocus
+              autoCorrect={false}
+              autoCapitalize="words"
               returnKeyType="done"
               onSubmitEditing={submitAddDish}
             />
@@ -551,6 +570,7 @@ export default function RestaurantPage() {
         showVibeRating={false}
         onConfirm={handleNewDishMunch}
         onClose={() => { setNewDishMunchSheet(false); setPendingDishName(null); }}
+        onDismissed={deferredAlert.flush}
         loading={actionLoading}
         title="Log to Munched"
       />

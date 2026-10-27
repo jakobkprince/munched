@@ -84,6 +84,14 @@ export function useDishActions() {
     }
   }
 
+  async function renameDish(dishId: string, name: string): Promise<void> {
+    const trimmed = name.trim();
+    if (!trimmed) throw new Error('Dish name can’t be empty.');
+    const { data, error } = await supabase.from('dishes').update({ name: trimmed }).eq('id', dishId).select('id');
+    if (error) throw error;
+    if (!data || data.length === 0) throw new Error('This dish could not be renamed.');
+  }
+
   async function deleteDish(dishId: string): Promise<void> {
     const { data, error } = await supabase.from('dishes').delete().eq('id', dishId).select('id');
     if (error) throw error;
@@ -130,5 +138,5 @@ export function useDishActions() {
     }
   }
 
-  return { addDish, addToEatList, addToMunched, reMunch, deleteDish, deleteFromEatList, deleteLog, deleteAllLogs, editEatListEntry, editDishLog };
+  return { addDish, addToEatList, addToMunched, reMunch, renameDish, deleteDish, deleteFromEatList, deleteLog, deleteAllLogs, editEatListEntry, editDishLog };
 }

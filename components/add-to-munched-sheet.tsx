@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, type ComponentRef } from 'react';
 import {
-  View, Text, TouchableOpacity, ScrollView, StyleSheet, Modal, KeyboardAvoidingView, Platform, Alert,
+  View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Modal, KeyboardAvoidingView, Platform, Alert,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { BulletTextInput } from './bullet-text-input';
@@ -111,7 +111,9 @@ interface Props {
   initialVibeRating?: number;
   initialNotes?: string;
   initialLogDate?: string;
-  onConfirm: (data: { rating: number; vibe_rating?: number; notes: string; log_date: string; photoUris: string[] }) => void;
+  /** When set, shows an editable Name field (used when editing a dish). */
+  initialName?: string;
+  onConfirm: (data: { rating: number; vibe_rating?: number; notes: string; log_date: string; photoUris: string[]; name?: string }) => void;
   onClose: () => void;
   /** Called once the sheet has fully closed — safe to show an Alert or another sheet. */
   onDismissed?: () => void;
@@ -119,10 +121,12 @@ interface Props {
   title?: string;
 }
 
-export function AddToMunchedSheet({ visible, showVibeRating = true, initialRating = 0, initialVibeRating = 0, initialNotes = '', initialLogDate, onConfirm, onClose, onDismissed, loading, title = 'Log to Munched' }: Props) {
+export function AddToMunchedSheet({ visible, showVibeRating = true, initialRating = 0, initialVibeRating = 0, initialNotes = '', initialLogDate, initialName, onConfirm, onClose, onDismissed, loading, title = 'Log to Munched' }: Props) {
   const [rating, setRating] = useState(initialRating);
   const [vibeRating, setVibeRating] = useState(initialVibeRating);
   const [notes, setNotes] = useState(initialNotes);
+  const [name, setName] = useState(initialName ?? '');
+  const showName = initialName !== undefined;
   const [photoUris, setPhotoUris] = useState<string[]>([]);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
@@ -141,6 +145,7 @@ export function AddToMunchedSheet({ visible, showVibeRating = true, initialRatin
       setRating(initialRating);
       setVibeRating(initialVibeRating);
       setNotes(initialNotes);
+      setName(initialName ?? '');
       setPhotoUris([]);
       setShowDatePicker(false);
       const d = parseDate(initialLogDate ?? todayString());
@@ -165,6 +170,10 @@ export function AddToMunchedSheet({ visible, showVibeRating = true, initialRatin
   const days = Array.from({ length: numDays }, (_, i) => String(i + 1));
 
   function handleConfirm() {
+    if (showName && !name.trim()) {
+      Alert.alert('Name required', 'Please enter a dish name.');
+      return;
+    }
     if (rating === 0) {
       Alert.alert('Rating required', 'Please select a star rating before saving.');
       return;
@@ -175,6 +184,7 @@ export function AddToMunchedSheet({ visible, showVibeRating = true, initialRatin
       notes,
       log_date: logDate,
       photoUris,
+      name: showName ? name.trim() : undefined,
     });
   }
 
@@ -200,6 +210,20 @@ export function AddToMunchedSheet({ visible, showVibeRating = true, initialRatin
           </TouchableOpacity>
         </View>
         <ScrollView style={styles.body} keyboardShouldPersistTaps="handled">
+          {showName && (
+            <>
+              <Text style={styles.label}>Name</Text>
+              <TextInput
+                style={styles.nameInput}
+                value={name}
+                onChangeText={setName}
+                placeholder="Dish name"
+                autoCorrect={false}
+                autoCapitalize="words"
+                returnKeyType="done"
+              />
+            </>
+          )}
           <Text style={styles.label}>Rating *</Text>
           <StarRating value={rating} onChange={setRating} size={36} />
 
@@ -290,6 +314,7 @@ const styles = StyleSheet.create({
   body: { padding: 16 },
   label: { fontSize: 14, fontWeight: '600', color: '#444', marginBottom: 8 },
   input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 12, fontSize: 15, minHeight: 100 },
+  nameInput: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 12, fontSize: 15, marginBottom: 20 },
   photoRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 32 },
   photoWrapper: { position: 'relative' },
   photo: { width: 80, height: 80, borderRadius: 8 },

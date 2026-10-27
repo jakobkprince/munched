@@ -21,6 +21,9 @@ async function compress(uri: string): Promise<ArrayBuffer> {
   return response.arrayBuffer();
 }
 
+/** Thrown when the log was saved but a photo upload failed. */
+export class PhotoUploadError extends Error {}
+
 /** Uploads photos and attaches them to a log. The log itself must already be saved. */
 export async function uploadLogPhotos(uris: string[], logType: LogType, logId: string): Promise<void> {
   try {
@@ -38,7 +41,7 @@ export async function uploadLogPhotos(uris: string[], logType: LogType, logId: s
     }
   } catch (e) {
     console.error('Photo upload failed:', e);
-    throw new Error('Your munch was saved, but a photo failed to upload. Use Edit to try adding it again.');
+    throw new PhotoUploadError('Your munch was saved, but a photo failed to upload. Use Edit to try adding it again.');
   }
 }
 
