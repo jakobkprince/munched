@@ -6,6 +6,7 @@ import { Image } from 'expo-image';
 import { formatDate } from '../lib/format';
 import { RestaurantLog, DishLog, Photo } from '../types';
 import { StarRating } from './star-rating';
+import { NoteText } from './note-text';
 import { photoUrl } from '../lib/photos';
 
 type Log = RestaurantLog | DishLog;
@@ -61,7 +62,7 @@ export function PreviousMunchesSheet({ visible, logs, photos, onClose, onDeleteL
               )}
 
               {selectedLog.notes ? (
-                <Text style={styles.notesDetail}>{selectedLog.notes}</Text>
+                <NoteText notes={selectedLog.notes} />
               ) : (
                 <Text style={styles.empty}>No notes for this visit.</Text>
               )}
@@ -184,7 +185,6 @@ const styles = StyleSheet.create({
   detail: { padding: 20, gap: 16 },
   vibeRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   vibeLabel: { fontSize: 14, color: '#666', fontWeight: '500' },
-  notesDetail: { fontSize: 15, color: '#333', flexShrink: 1 },
   empty: { fontSize: 14, color: '#aaa', fontStyle: 'italic' },
   photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   photo: { width: 120, height: 120, borderRadius: 8 },

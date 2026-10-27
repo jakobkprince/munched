@@ -16,6 +16,7 @@ import { useTags } from '../../hooks/use-tags';
 import { photoUrl, PhotoUploadError } from '../../lib/photos';
 import { useDeferredAlert } from '../../hooks/use-deferred-alert';
 import { StarRating } from '../../components/star-rating';
+import { NoteText } from '../../components/note-text';
 import { AddToEatListSheet } from '../../components/add-to-eat-list-sheet';
 import { AddToMunchedSheet } from '../../components/add-to-munched-sheet';
 import { TagPickerSheet } from '../../components/tag-picker-sheet';
@@ -468,7 +469,7 @@ export default function RestaurantPage() {
           {allLogs.filter((l) => l.notes).map((log) => (
             <View key={log.id} style={styles.noteItem}>
               <Text style={styles.noteDate}>{formatDate(log.log_date)}</Text>
-              <Text style={styles.noteText}>{log.notes}</Text>
+              <NoteText notes={log.notes} />
             </View>
           ))}
         </View>
@@ -478,7 +479,7 @@ export default function RestaurantPage() {
       {status.inEatList && status.eatListEntry?.notes && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Notes</Text>
-          <Text style={styles.noteText}>{status.eatListEntry.notes}</Text>
+          <NoteText notes={status.eatListEntry.notes} />
         </View>
       )}
 
@@ -688,8 +689,6 @@ const styles = StyleSheet.create({
   photo: { width: 120, height: 120, borderRadius: 8 },
   noteItem: { marginBottom: 12 },
   noteDate: { fontSize: 12, color: '#999', marginBottom: 2 },
-  // No lineHeight: on a real iPhone it made long notes draw on one line, cut off
-  noteText: { fontSize: 15, color: '#333', flexShrink: 1 },
   dishRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderColor: '#f0f0f0' },
   dishInfo: { flex: 1, gap: 4 },
   dishName: { fontSize: 15, color: '#1a1a1a' },
