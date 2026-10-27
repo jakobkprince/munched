@@ -30,16 +30,27 @@ export function NoteText({ notes }: { notes: string | null }) {
 
 function WrappedLine({ text }: { text: string }) {
   const [contentHeight, setContentHeight] = useState<number>();
+  // TEMPORARY DIAGNOSTIC (remove after the owner's screenshot)
+  const [box, setBox] = useState('');
+  const [content, setContent] = useState('');
   return (
-    <TextInput
-      value={text}
-      editable={false}
-      multiline
-      scrollEnabled={false}
-      pointerEvents="none"
-      onContentSizeChange={(e) => setContentHeight(Math.ceil(e.nativeEvent.contentSize.height))}
-      style={[styles.text, styles.line, contentHeight !== undefined && { minHeight: contentHeight }]}
-    />
+    <View style={{ flex: 1 }}>
+      <TextInput
+        value={text}
+        editable={false}
+        multiline
+        scrollEnabled={false}
+        pointerEvents="none"
+        onLayout={(e) => setBox(`${Math.round(e.nativeEvent.layout.width)}x${Math.round(e.nativeEvent.layout.height)}`)}
+        onContentSizeChange={(e) => {
+          const { width, height } = e.nativeEvent.contentSize;
+          setContent(`${Math.round(width)}x${Math.round(height)}`);
+          setContentHeight(Math.ceil(height));
+        }}
+        style={[styles.text, styles.line, { backgroundColor: '#fff6c2' }, contentHeight !== undefined && { minHeight: contentHeight }]}
+      />
+      <Text style={{ fontSize: 10, color: '#999' }}>box {box} · content {content}</Text>
+    </View>
   );
 }
 
