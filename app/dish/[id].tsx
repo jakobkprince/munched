@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActionSheetIOS, Platform,
 } from 'react-native';
@@ -27,7 +27,8 @@ interface DishStatus {
 
 export default function DishPage() {
   const insets = useSafeAreaInsets();
-  const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
+  // askRestaurant=1: we just munched this dish from the Eat-List (see handleAddToMunched)
+  const { id, from, askRestaurant } = useLocalSearchParams<{ id: string; from?: string; askRestaurant?: string }>();
   const actions = useDishActions();
   const restaurantActions = useRestaurantActions();
   const tagActions = useTags();
@@ -47,6 +48,9 @@ export default function DishPage() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [restaurantMunchSheet, setRestaurantMunchSheet] = useState(false);
+  const [restaurantEatListNotes, setRestaurantEatListNotes] = useState('');
+  const [promptWhenSheetCloses, setPromptWhenSheetCloses] = useState(false);
+  const askedAboutRestaurant = useRef(false);
 
   const loadDish = useCallback(async () => {
     setLoading(true);
@@ -92,6 +96,35 @@ export default function DishPage() {
 
   useEffect(() => { loadDish(); }, [loadDish]);
 
+  // After munching a dish whose restaurant is on the Eat-List (and not yet munched),
+  // offer to munch the restaurant too. "Later" just leaves you on the dish.
+  const promptToMunchRestaurant = useCallback(async (r: Restaurant) => {
+    const [eatListRes, logsRes] = await Promise.all([
+      supabase.from('eat_list_restaurants').select('notes').eq('restaurant_id', r.id).maybeSingle(),
+      supabase.from('restaurant_logs').select('id').eq('restaurant_id', r.id).limit(1),
+    ]);
+    if (eatListRes.error || logsRes.error) {
+      console.error('Failed to check restaurant status:', eatListRes.error ?? logsRes.error);
+      return;
+    }
+    const restaurantInEatList = !!eatListRes.data;
+    const restaurantInMunched = (logsRes.data ?? []).length > 0;
+    if (!restaurantInEatList || restaurantInMunched) return;
+
+    setRestaurantEatListNotes(eatListRes.data?.notes ?? '');
+    Alert.alert(`Add ${r.name} to Munched?`, undefined, [
+      { text: 'Later', style: 'cancel' },
+      { text: 'Yes', onPress: () => setRestaurantMunchSheet(true) },
+    ]);
+  }, []);
+
+  useEffect(() => {
+    if (askRestaurant !== '1' || !restaurant || askedAboutRestaurant.current) return;
+    askedAboutRestaurant.current = true;
+    router.setParams({ askRestaurant: undefined });
+    promptToMunchRestaurant(restaurant);
+  }, [askRestaurant, restaurant, promptToMunchRestaurant]);
+
   if (!dish || !restaurant) {
     return <View style={styles.center}><Text>Loading...</Text></View>;
   }
@@ -100,7 +133,6 @@ export default function DishPage() {
   const inAnyList = status.inEatList || status.inMunched;
 
   async function handleAddToMunched(data: { rating: number; vibe_rating?: number; notes: string; log_date: string; photoUris: string[] }) {
-    const wasInEatList = status.inEatList;
     setActionLoading(true);
     try {
       await actions.addToMunched(id, {
@@ -109,31 +141,15 @@ export default function DishPage() {
         log_date: data.log_date,
         photoUris: data.photoUris,
       });
-      await loadDish();
       if (from === 'eat-list') {
+        // Move to the Munched tab; the dish page there asks about the restaurant
         router.navigate('/(tabs)/munched/dishes');
-        router.push(`/dish/${id}?from=munched`);
+        router.push(`/dish/${id}?from=munched&askRestaurant=1`);
         return;
       }
-      // Check if the restaurant is in Eat-List but not yet in Munched
-      if (restaurant) {
-        const [eatListRes, logsRes] = await Promise.all([
-          supabase.from('eat_list_restaurants').select('id').eq('restaurant_id', restaurant.id).maybeSingle(),
-          supabase.from('restaurant_logs').select('id').eq('restaurant_id', restaurant.id).limit(1),
-        ]);
-        const restaurantInEatList = !!eatListRes.data;
-        const restaurantInMunched = (logsRes.data ?? []).length > 0;
-        if (restaurantInEatList && !restaurantInMunched) {
-          Alert.alert(
-            `Add ${restaurant.name} to Munched?`,
-            '',
-            [
-              { text: 'Later', style: 'cancel' },
-              { text: 'Yes', onPress: () => setRestaurantMunchSheet(true) },
-            ]
-          );
-        }
-      }
+      await loadDish();
+      // An Alert shown while the sheet is closing gets dismissed with it, so wait
+      setPromptWhenSheetCloses(true);
     } catch (e) {
       Alert.alert('Error', e instanceof Error ? e.message : 'Failed to log dish');
     } finally {
@@ -458,6 +474,11 @@ export default function DishPage() {
         initialLogDate={isEditMode ? (latestLog?.log_date ?? undefined) : undefined}
         onConfirm={isEditMode ? handleEditMunched : (status.inMunched ? handleReMunch : handleAddToMunched)}
         onClose={() => { setMunchedSheet(false); setIsEditMode(false); }}
+        onDismissed={() => {
+          if (!promptWhenSheetCloses) return;
+          setPromptWhenSheetCloses(false);
+          promptToMunchRestaurant(restaurant);
+        }}
         loading={actionLoading}
         title={isEditMode ? 'Edit Munch' : (status.inMunched ? 'Re-Munch' : 'Log to Munched')}
       />
@@ -470,6 +491,7 @@ export default function DishPage() {
       <AddToMunchedSheet
         visible={restaurantMunchSheet}
         showVibeRating
+        initialNotes={restaurantEatListNotes}
         onConfirm={handleAddRestaurantToMunched}
         onClose={() => setRestaurantMunchSheet(false)}
         loading={actionLoading}

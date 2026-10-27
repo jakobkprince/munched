@@ -113,11 +113,13 @@ interface Props {
   initialLogDate?: string;
   onConfirm: (data: { rating: number; vibe_rating?: number; notes: string; log_date: string; photoUris: string[] }) => void;
   onClose: () => void;
+  /** Called once the sheet has fully closed — safe to show an Alert or another sheet. */
+  onDismissed?: () => void;
   loading?: boolean;
   title?: string;
 }
 
-export function AddToMunchedSheet({ visible, showVibeRating = true, initialRating = 0, initialVibeRating = 0, initialNotes = '', initialLogDate, onConfirm, onClose, loading, title = 'Log to Munched' }: Props) {
+export function AddToMunchedSheet({ visible, showVibeRating = true, initialRating = 0, initialVibeRating = 0, initialNotes = '', initialLogDate, onConfirm, onClose, onDismissed, loading, title = 'Log to Munched' }: Props) {
   const [rating, setRating] = useState(initialRating);
   const [vibeRating, setVibeRating] = useState(initialVibeRating);
   const [notes, setNotes] = useState(initialNotes);
@@ -188,7 +190,7 @@ export function AddToMunchedSheet({ visible, showVibeRating = true, initialRatin
   }
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose} onDismiss={onDismissed}>
       <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose}><Text style={styles.cancel}>Cancel</Text></TouchableOpacity>
