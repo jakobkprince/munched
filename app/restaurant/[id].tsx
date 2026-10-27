@@ -22,7 +22,7 @@ import { TagPickerSheet } from '../../components/tag-picker-sheet';
 import { PreviousMunchesSheet } from '../../components/previous-munches-sheet';
 import { supabase } from '../../lib/supabase';
 import { CUISINE_TAGS } from '../../constants/tags';
-import { RestaurantLog, Photo } from '../../types';
+import { Dish, RestaurantLog, Photo } from '../../types';
 
 export default function RestaurantPage() {
   const insets = useSafeAreaInsets();
@@ -333,6 +333,18 @@ export default function RestaurantPage() {
 
   const inAnyList = status.inEatList || status.inMunched;
 
+  function renderDishRow(dish: Dish, rating?: number) {
+    return (
+      <TouchableOpacity key={dish.id} style={styles.dishRow} onPress={() => router.push(`/dish/${dish.id}${from ? `?from=${from}` : ''}`)}>
+        <View style={styles.dishInfo}>
+          <Text style={styles.dishName}>{dish.name}</Text>
+          {rating !== undefined && <StarRating value={rating} size={14} />}
+        </View>
+        <Ionicons name="chevron-forward" size={16} color="#ccc" />
+      </TouchableOpacity>
+    );
+  }
+
   return (
     <View style={[styles.page, { paddingTop: insets.top }]}>
       {(from || status.inMunched || status.inEatList) && (
@@ -478,20 +490,18 @@ export default function RestaurantPage() {
             <Text style={styles.addBtn}>+ Add Dish</Text>
           </TouchableOpacity>
         </View>
-        {[
-          { label: 'Munched', list: munchedDishes },
-          { label: 'Eat-List', list: eatListDishes },
-        ].filter((group) => group.list.length > 0).map((group) => (
-          <View key={group.label} style={styles.dishGroup}>
-            <Text style={styles.dishGroupTitle}>{group.label}</Text>
-            {group.list.map((dish) => (
-              <TouchableOpacity key={dish.id} style={styles.dishRow} onPress={() => router.push(`/dish/${dish.id}${from ? `?from=${from}` : ''}`)}>
-                <Text style={styles.dishName}>{dish.name}</Text>
-                <Ionicons name="chevron-forward" size={16} color="#ccc" />
-              </TouchableOpacity>
-            ))}
+        {munchedDishes.length > 0 && (
+          <View style={styles.dishGroup}>
+            <Text style={styles.dishGroupTitle}>Munched</Text>
+            {munchedDishes.map((dish) => renderDishRow(dish, dish.latestRating ?? 0))}
           </View>
-        ))}
+        )}
+        {eatListDishes.length > 0 && (
+          <View style={styles.dishGroup}>
+            <Text style={styles.dishGroupTitle}>Eat-List</Text>
+            {eatListDishes.map((dish) => renderDishRow(dish))}
+          </View>
+        )}
       </View>
 
       {/* Map preview */}
@@ -680,6 +690,7 @@ const styles = StyleSheet.create({
   noteDate: { fontSize: 12, color: '#999', marginBottom: 2 },
   noteText: { fontSize: 15, color: '#333', lineHeight: 22 },
   dishRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderColor: '#f0f0f0' },
+  dishInfo: { flex: 1, gap: 4 },
   dishName: { fontSize: 15, color: '#1a1a1a' },
   dishGroup: { marginBottom: 12 },
   dishGroupTitle: { fontSize: 13, fontWeight: '700', color: '#FF6B35', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 4 },

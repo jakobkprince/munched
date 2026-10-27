@@ -5,8 +5,11 @@ import { MunchedDishSortField, EatListSortField, SortDirection } from '../consta
 import { distanceTo, compareDistance } from './use-location';
 import { Coordinates } from '../types';
 
+// latestRating: the rating from the most recent munch (null if never munched or unrated)
+export type RestaurantDish = Dish & { latestRating: number | null };
+
 export function useRestaurantDishes(restaurantId: string) {
-  const [munchedDishes, setMunchedDishes] = useState<Dish[]>([]);
+  const [munchedDishes, setMunchedDishes] = useState<RestaurantDish[]>([]);
   const [eatListDishes, setEatListDishes] = useState<Dish[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -14,7 +17,7 @@ export function useRestaurantDishes(restaurantId: string) {
     if (showLoading) setLoading(true);
     const { data, error } = await supabase
       .from('dishes')
-      .select('*, eat_list_dishes(id), dish_logs(id)')
+      .select('*, eat_list_dishes(id), dish_logs(rating, log_date, created_at)')
       .eq('restaurant_id', restaurantId)
       .order('name');
     if (error) {
@@ -24,7 +27,16 @@ export function useRestaurantDishes(restaurantId: string) {
     }
     // A dish that has been munched counts as Munched, even if it's also on the Eat-List
     const rows = data ?? [];
-    setMunchedDishes(rows.filter((d) => d.dish_logs.length > 0));
+    setMunchedDishes(
+      rows
+        .filter((d) => d.dish_logs.length > 0)
+        .map(({ dish_logs, eat_list_dishes, ...dish }) => {
+          const latest = [...dish_logs].sort((a, b) =>
+            b.log_date.localeCompare(a.log_date) || b.created_at.localeCompare(a.created_at)
+          )[0];
+          return { ...dish, latestRating: latest.rating };
+        })
+    );
     setEatListDishes(rows.filter((d) => d.dish_logs.length === 0 && d.eat_list_dishes.length > 0));
     setLoading(false);
   }, [restaurantId]);
