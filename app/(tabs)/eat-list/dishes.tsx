@@ -51,7 +51,8 @@ function EatListDishCard({ item }: { item: EatListDishView }) {
       <TouchableOpacity
         onPress={() => router.push(`/restaurant/${item.restaurant.id}?from=eat-list`)}
         activeOpacity={0.7}
-        hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+        // Only the name itself is tappable; the rest of the row opens the dish
+        style={cardStyles.restaurantLink}
       >
         <Text style={cardStyles.restaurantName} numberOfLines={1}>{item.restaurant.name}</Text>
       </TouchableOpacity>
@@ -66,6 +67,7 @@ function EatListDishCard({ item }: { item: EatListDishView }) {
 }
 
 const cardStyles = StyleSheet.create({
+  restaurantLink: { alignSelf: 'flex-start' },
   card: {
     backgroundColor: '#fff',
     marginHorizontal: 12,

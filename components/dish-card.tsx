@@ -24,7 +24,8 @@ export function DishCard({ item }: Props) {
             e.stopPropagation();
             router.push(`/restaurant/${restaurant.id}?from=munched` as const);
           }}
-          hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+          // Only the name itself is tappable; the rest of the row opens the dish
+          style={styles.restaurantLink}
         >
           <Text style={styles.restaurantName} numberOfLines={1}>{restaurant.name}</Text>
         </TouchableOpacity>
@@ -58,6 +59,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#111',
+  },
+  restaurantLink: {
+    alignSelf: 'flex-start',
   },
   restaurantName: {
     fontSize: 13,
