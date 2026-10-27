@@ -52,6 +52,7 @@ export function AddToEatListSheet({ visible, initialNotes = '', initialName, tit
                 value={name}
                 onChangeText={setName}
                 placeholder="Dish name"
+                maxLength={200}
                 autoCorrect={false}
                 autoCapitalize="words"
                 returnKeyType="done"

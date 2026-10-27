@@ -548,6 +548,7 @@ export default function RestaurantPage() {
               placeholder="Dish name"
               value={addDishName}
               onChangeText={setAddDishName}
+              maxLength={200}
               autoFocus
               autoCorrect={false}
               autoCapitalize="words"

@@ -218,6 +218,7 @@ export function AddToMunchedSheet({ visible, showVibeRating = true, initialRatin
                 value={name}
                 onChangeText={setName}
                 placeholder="Dish name"
+                maxLength={200}
                 autoCorrect={false}
                 autoCapitalize="words"
                 returnKeyType="done"
