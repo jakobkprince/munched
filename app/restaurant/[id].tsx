@@ -682,7 +682,7 @@ const styles = StyleSheet.create({
   dishRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderColor: '#f0f0f0' },
   dishName: { fontSize: 15, color: '#1a1a1a' },
   dishGroup: { marginBottom: 12 },
-  dishGroupTitle: { fontSize: 13, fontWeight: '600', color: '#888', textTransform: 'uppercase', marginTop: 4 },
+  dishGroupTitle: { fontSize: 13, fontWeight: '700', color: '#FF6B35', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 4 },
   mapContainer: {
     borderRadius: 12,
     overflow: 'hidden',
