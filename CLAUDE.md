@@ -10,6 +10,7 @@ The owner is **non-technical** and delegates every technical decision to Claude.
 - Work autonomously. Stop only when the owner must physically do something (log in somewhere, install a build on their phone, approve something on Apple's or Expo's site).
 - When you do need them, give numbered steps or exact copy-paste commands with no jargon, and say what they'll see when it worked.
 - Verify changes yourself in the iOS Simulator before calling them done (see "Testing").
+- Do the whole release yourself (see "Shipping"). Before anything that touches the live backend (`supabase db push`, `supabase functions deploy`/`delete`), get one explicit go-ahead from the owner in chat, then do the rest. When a new build finishes, give them the install link (they open it on their iPhone and tap Install).
 
 ## Stack
 
