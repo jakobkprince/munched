@@ -1,15 +1,14 @@
-import { useState } from 'react';
-import { View, Text, TextInput, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 
 const BULLET = '• ';
 
 /**
  * Displays saved notes, one row per line, with a hanging indent for bullets.
  *
- * On the owner's iPhone (iOS 27), a long <Text> was drawn on one line and cut
- * off at the screen edge, while the multiline TextInput in the edit sheets
- * wrapped fine. So each line is shown in a read-only multiline TextInput,
- * at least as tall as the content height iOS reports.
+ * On the owner's iPhone (iOS 27), iOS sizes multi-line text for every line but
+ * draws only the first, both in <Text> and in a read-only TextInput. So we
+ * never ask iOS to wrap: each word is its own single-line <Text>, and the
+ * layout engine (flexWrap) moves words onto the next line.
  */
 export function NoteText({ notes }: { notes: string | null }) {
   if (!notes) return null;
@@ -19,7 +18,7 @@ export function NoteText({ notes }: { notes: string | null }) {
         const bulleted = line.startsWith(BULLET);
         return (
           <View key={i} style={styles.row}>
-            {bulleted && <Text style={[styles.text, styles.bullet]}>•</Text>}
+            {bulleted && <Text style={styles.text}>•</Text>}
             <WrappedLine text={bulleted ? line.slice(BULLET.length) : line} />
           </View>
         );
@@ -29,27 +28,18 @@ export function NoteText({ notes }: { notes: string | null }) {
 }
 
 function WrappedLine({ text }: { text: string }) {
-  const [contentHeight, setContentHeight] = useState<number>();
-  // TEMPORARY DIAGNOSTIC (remove after the owner's screenshot)
-  const [box, setBox] = useState('');
-  const [content, setContent] = useState('');
+  const words = text.split(' ').filter(Boolean);
   return (
-    <View style={{ flex: 1 }}>
-      <TextInput
-        value={text}
-        editable={false}
-        multiline
-        scrollEnabled={false}
-        pointerEvents="none"
-        onLayout={(e) => setBox(`${Math.round(e.nativeEvent.layout.width)}x${Math.round(e.nativeEvent.layout.height)}`)}
-        onContentSizeChange={(e) => {
-          const { width, height } = e.nativeEvent.contentSize;
-          setContent(`${Math.round(width)}x${Math.round(height)}`);
-          setContentHeight(Math.ceil(height));
-        }}
-        style={[styles.text, styles.line, { backgroundColor: '#fff6c2' }, contentHeight !== undefined && { minHeight: contentHeight }]}
-      />
-      <Text style={{ fontSize: 10, color: '#999' }}>box {box} · content {content}</Text>
+    <View style={styles.words} accessible accessibilityLabel={text}>
+      {words.length === 0 ? (
+        <Text style={styles.text}> </Text>
+      ) : (
+        words.map((word, i) => (
+          <Text key={i} style={styles.text}>
+            {word}
+          </Text>
+        ))
+      )}
     </View>
   );
 }
@@ -57,7 +47,7 @@ function WrappedLine({ text }: { text: string }) {
 const styles = StyleSheet.create({
   container: { alignSelf: 'stretch', gap: 2 },
   row: { flexDirection: 'row', gap: 6 },
+  // columnGap stands in for the space between words
+  words: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', columnGap: 4 },
   text: { fontSize: 15, color: '#333' },
-  bullet: { lineHeight: 20 },
-  line: { flex: 1, padding: 0, paddingTop: 0, paddingBottom: 0, minHeight: 20 },
 });
