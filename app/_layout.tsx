@@ -50,7 +50,6 @@ export default function RootLayout() {
       </Stack.Protected>
       <Stack.Protected guard={!signedIn} redirectTo="/(tabs)/eat-list">
         <Stack.Screen name="auth/sign-in" />
-        <Stack.Screen name="auth/sign-up" />
       </Stack.Protected>
     </Stack>
   );

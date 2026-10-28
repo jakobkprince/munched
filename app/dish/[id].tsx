@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { formatDate } from '../../lib/format';
-import { useLocalSearchParams, router } from 'expo-router';
+import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useDishActions } from '../../hooks/use-dish-actions';
@@ -14,9 +14,12 @@ import { photoUrl, PhotoUploadError } from '../../lib/photos';
 import { useDeferredAlert } from '../../hooks/use-deferred-alert';
 import { StarRating } from '../../components/star-rating';
 import { NoteText } from '../../components/note-text';
-import { AddToMunchedSheet } from '../../components/add-to-munched-sheet';
+import { AddToMunchedSheet, MunchSheetData } from '../../components/add-to-munched-sheet';
 import { AddToEatListSheet } from '../../components/add-to-eat-list-sheet';
 import { TagPickerSheet } from '../../components/tag-picker-sheet';
+import { TagChips } from '../../components/tag-chips';
+import { PhotoViewer } from '../../components/photo-viewer';
+import { PageStatus } from '../../components/page-status';
 import { PreviousMunchesSheet } from '../../components/previous-munches-sheet';
 import { supabase } from '../../lib/supabase';
 import { Dish, Restaurant, DishLog, EatListDish, Photo } from '../../types';
@@ -42,7 +45,7 @@ export default function DishPage() {
   const [tags, setTags] = useState<string[]>([]);
   const [allLogs, setAllLogs] = useState<DishLog[]>([]);
   const [allPhotos, setAllPhotos] = useState<Photo[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [munchedSheet, setMunchedSheet] = useState(false);
   const [eatListSheet, setEatListSheet] = useState(false);
@@ -50,13 +53,17 @@ export default function DishPage() {
   const [prevMunchesSheet, setPrevMunchesSheet] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [tagSaving, setTagSaving] = useState(false);
+  // Index of the photo open full-screen (null = closed)
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [restaurantMunchSheet, setRestaurantMunchSheet] = useState(false);
   const [restaurantEatListNotes, setRestaurantEatListNotes] = useState('');
   const [promptWhenSheetCloses, setPromptWhenSheetCloses] = useState(false);
   const askedAboutRestaurant = useRef(false);
+  const loadedOnce = useRef(false);
 
   const loadDish = useCallback(async () => {
-    setLoading(true);
+    setError(null);
     try {
       const [dishRes, eatListRes, logsRes, tagsRes] = await Promise.all([
         supabase.from('dishes').select('*, restaurant:restaurants(*)').eq('id', id).single(),
@@ -65,19 +72,22 @@ export default function DishPage() {
         supabase.from('dish_tags').select('tag').eq('dish_id', id),
       ]);
       if (dishRes.error) throw dishRes.error;
+      if (eatListRes.error) throw eatListRes.error;
+      if (logsRes.error) throw logsRes.error;
+      if (tagsRes.error) throw tagsRes.error;
 
       const dishData = dishRes.data as Dish & { restaurant: Restaurant };
       setDish(dishData);
       setRestaurant(dishData.restaurant);
 
-      const logs: DishLog[] = logsRes.data ?? [];
+      const logs: DishLog[] = logsRes.data;
       setAllLogs(logs);
       setStatus({
         inEatList: !!eatListRes.data,
         inMunched: logs.length > 0,
         eatListEntry: eatListRes.data ?? null,
       });
-      setTags((tagsRes.data ?? []).map((t) => t.tag));
+      setTags(tagsRes.data.map((t) => t.tag));
 
       if (logs.length > 0) {
         const logIds = logs.map((l) => l.id);
@@ -85,19 +95,24 @@ export default function DishPage() {
           .from('photos')
           .select('*')
           .eq('log_type', 'dish_log')
-          .in('log_id', logIds);
-        setAllPhotos(photosRes.data ?? []);
+          .in('log_id', logIds)
+          .order('created_at', { ascending: false });
+        if (photosRes.error) throw photosRes.error;
+        setAllPhotos(photosRes.data);
       } else {
         setAllPhotos([]);
       }
+      loadedOnce.current = true;
     } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Failed to load dish');
-    } finally {
-      setLoading(false);
+      const message = e instanceof Error ? e.message : 'Failed to load dish';
+      setError(message);
+      // Once the page is showing, a failed reload needs a message of its own
+      if (loadedOnce.current) Alert.alert('Error', message);
     }
   }, [id]);
 
-  useEffect(() => { loadDish(); }, [loadDish]);
+  // Reload on return, e.g. after tagging the restaurant (which tags its dishes too)
+  useFocusEffect(useCallback(() => { loadDish(); }, [loadDish]));
 
   // After munching a dish whose restaurant is on the Eat-List (and not yet munched),
   // offer to munch the restaurant too. "Later" just leaves you on the dish.
@@ -129,7 +144,7 @@ export default function DishPage() {
   }, [askRestaurant, restaurant, promptToMunchRestaurant]);
 
   if (!dish || !restaurant) {
-    return <View style={styles.center}><Text>Loading...</Text></View>;
+    return <PageStatus error={error} onRetry={loadDish} />;
   }
 
   const latestLog = allLogs[0] ?? null;
@@ -147,7 +162,7 @@ export default function DishPage() {
     Alert.alert('Error', e instanceof Error ? e.message : fallback);
   }
 
-  async function handleAddToMunched(data: { rating: number; vibe_rating?: number; notes: string; log_date: string; photoUris: string[] }) {
+  async function handleAddToMunched(data: MunchSheetData) {
     setActionLoading(true);
     try {
       await actions.addToMunched(id, {
@@ -174,7 +189,7 @@ export default function DishPage() {
     }
   }
 
-  async function handleAddRestaurantToMunched(data: { rating: number; vibe_rating?: number; notes: string; log_date: string; photoUris: string[] }) {
+  async function handleAddRestaurantToMunched(data: MunchSheetData) {
     if (!restaurant) return;
     setActionLoading(true);
     try {
@@ -193,7 +208,7 @@ export default function DishPage() {
     }
   }
 
-  async function handleReMunch(data: { rating: number; vibe_rating?: number; notes: string; log_date: string; photoUris: string[] }) {
+  async function handleReMunch(data: MunchSheetData) {
     setActionLoading(true);
     try {
       await actions.reMunch(id, {
@@ -211,21 +226,35 @@ export default function DishPage() {
     }
   }
 
-  async function handleAddTag(tag: string) {
+  async function handleAddTags(newTags: string[]) {
+    setTagSaving(true);
     try {
-      await tagActions.addDishTag(id, tag);
+      await tagActions.addDishTags(id, newTags);
       await loadDish();
+      setTagSheet(false);
     } catch (e) {
-      Alert.alert('Error', 'Failed to add tag');
+      Alert.alert('Error', e instanceof Error ? e.message : 'Failed to add tags');
+    } finally {
+      setTagSaving(false);
     }
   }
 
   async function handleRemoveTag(tag: string) {
     try {
-      await tagActions.removeDishTag(id, tag);
+      await tagActions.removeDishTags(id, [tag]);
       await loadDish();
     } catch (e) {
-      Alert.alert('Error', 'Failed to remove tag');
+      Alert.alert('Error', e instanceof Error ? e.message : 'Failed to remove tag');
+    }
+  }
+
+  // A dish on neither list can't be found anywhere, so it's deleted (see
+  // deleteDishIfUnused); leave its page when that happens
+  async function reloadOrLeave() {
+    if (await actions.deleteDishIfUnused(id)) {
+      router.back();
+    } else {
+      await loadDish();
     }
   }
 
@@ -257,7 +286,7 @@ export default function DishPage() {
     }
   }
 
-  async function handleEditMunched(data: { rating: number; vibe_rating?: number; notes: string; log_date: string; photoUris: string[]; name?: string }) {
+  async function handleEditMunched(data: MunchSheetData) {
     if (!latestLog) return;
     setActionLoading(true);
     try {
@@ -310,7 +339,7 @@ export default function DishPage() {
             text: 'Delete', style: 'destructive', onPress: async () => {
               try {
                 await actions.deleteAllLogs(id);
-                await loadDish();
+                await reloadOrLeave();
               } catch (e) {
                 Alert.alert('Error', e instanceof Error ? e.message : 'Failed to delete');
               }
@@ -325,9 +354,10 @@ export default function DishPage() {
               try {
                 await actions.deleteFromEatList(status.eatListEntry!.id);
                 if (from === 'eat-list') {
+                  await actions.deleteDishIfUnused(id);
                   router.back();
                 } else {
-                  await loadDish();
+                  await reloadOrLeave();
                 }
               } catch (e) {
                 Alert.alert('Error', e instanceof Error ? e.message : 'Failed to delete');
@@ -389,22 +419,7 @@ export default function DishPage() {
               <Text style={styles.addBtn}>+ Add</Text>
             </TouchableOpacity>
           </View>
-          <View style={styles.tagRow}>
-            {tags.map((tag) => (
-              <TouchableOpacity
-                key={tag}
-                style={styles.tag}
-                onLongPress={() =>
-                  Alert.alert('Remove Tag', `Remove "${tag}"?`, [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Remove', onPress: () => handleRemoveTag(tag) },
-                  ])
-                }
-              >
-                <Text style={styles.tagText}>{tag}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <TagChips tags={tags} onRemove={handleRemoveTag} />
         </View>
       )}
 
@@ -422,12 +437,11 @@ export default function DishPage() {
           <Text style={styles.sectionTitle}>Photos</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.photoRow}>
-              {allPhotos
-                .slice()
-                .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                .map((photo) => (
-                  <Image key={photo.id} source={{ uri: photoUrl(photo.storage_path) }} style={styles.photo} />
-                ))}
+              {allPhotos.map((photo, i) => (
+                <TouchableOpacity key={photo.id} onPress={() => setViewerIndex(i)} activeOpacity={0.8}>
+                  <Image source={{ uri: photoUrl(photo.storage_path) }} style={styles.photo} />
+                </TouchableOpacity>
+              ))}
             </View>
           </ScrollView>
         </View>
@@ -506,8 +520,9 @@ export default function DishPage() {
       <TagPickerSheet
         visible={tagSheet}
         selectedTags={tags}
-        onAdd={handleAddTag}
+        onDone={handleAddTags}
         onClose={() => setTagSheet(false)}
+        saving={tagSaving}
       />
       <AddToMunchedSheet
         visible={restaurantMunchSheet}
@@ -526,8 +541,21 @@ export default function DishPage() {
         onClose={() => setPrevMunchesSheet(false)}
         onDeleteLog={async (logId) => {
           await actions.deleteLog(logId);
+          if (await actions.deleteDishIfUnused(id)) {
+            setPrevMunchesSheet(false);
+            router.back();
+            return;
+          }
           await loadDish();
         }}
+        onPhotoDeleted={loadDish}
+      />
+      <PhotoViewer
+        photos={allPhotos}
+        startIndex={viewerIndex}
+        logDates={Object.fromEntries(allLogs.map((l) => [l.id, l.log_date]))}
+        onClose={() => setViewerIndex(null)}
+        onDeleted={loadDish}
       />
     </ScrollView>
 
@@ -562,7 +590,6 @@ const styles = StyleSheet.create({
   contextBannerText: { fontSize: 13, fontWeight: '700', color: '#FF6B35', textTransform: 'uppercase', letterSpacing: 0.5 },
   container: { flex: 1, backgroundColor: '#fff' },
   content: { padding: 20, paddingBottom: 110 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
   name: { fontSize: 24, fontWeight: '700', flex: 1, marginRight: 12 },
   restaurantLink: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 20 },
@@ -571,9 +598,6 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   sectionTitle: { fontSize: 16, fontWeight: '600', color: '#1a1a1a', marginBottom: 8 },
   addBtn: { fontSize: 14, color: '#FF6B35', fontWeight: '500' },
-  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  tag: { backgroundColor: '#f0f0f0', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
-  tagText: { fontSize: 13, color: '#333' },
   photoRow: { flexDirection: 'row', gap: 8 },
   photo: { width: 120, height: 120, borderRadius: 8 },
   noteItem: { marginBottom: 12 },

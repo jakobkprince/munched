@@ -26,6 +26,7 @@ The owner is **non-technical** and delegates every technical decision to Claude.
 app/                 Screens (Expo Router). (tabs)/ = Eat-List, Map, Munched
 components/          Reusable UI (kebab-case files)
 hooks/               Data loading + mutations (use-*-actions.ts write, use-restaurants/use-dishes read)
+lib/lists.ts         Tag counting/filtering shared by the list hooks
 lib/supabase.ts      The one Supabase client + requireUserId()
 lib/photos.ts        Photo upload (auto-downscaled), delete, public URL — always use these
 lib/format.ts        formatDate() — always use for displaying dates (see Gotchas)
@@ -94,4 +95,7 @@ Build signing is managed by EAS (Apple team `7JGJQC5JJH`). The distribution cert
 - **SECURITY DEFINER helpers go in the `private` schema** (not `public`), so they aren't callable through the API. Run `supabase db advisors --linked` after pushing migrations: the local check misses some warnings.
 - **Keep `app.config.ts` free of environment-dependent values** (no `process.env`). It feeds the runtime fingerprint, and a value that differs between EAS Build and your machine makes OTA updates silently miss the installed build.
 - **`useFocusEffect` callbacks must be stable.** Wrap refresh functions in `useCallback`, or the screen refetches in a loop.
+- **Lists load through `useFocusedQuery`** (`hooks/use-focused-query.ts`): they reload each time the screen gains focus, show a spinner only on the very first load (so lists keep their scroll position), and sort/filter in memory. Don't put sort or filter values in a loader's dependencies. Restaurant and dish pages also reload on focus.
+- **Sign-ups are off** (single-user app): the hosted project has "Allow new users to sign up" disabled and the app has no Sign Up screen. Don't add one back.
+- **Dishes on neither list are deleted** (`deleteDishIfUnused`), since nothing can show them. Adding a dish whose name already exists at that restaurant reuses it.
 - The `restaurants` table has no UPDATE rule: insert first, and on a duplicate-key conflict select the existing row (see `upsertRestaurant`).

@@ -104,6 +104,16 @@ const pickerStyles = StyleSheet.create({
   },
 });
 
+/** What the sheet saves. vibe_rating is null when no vibe was given. */
+export interface MunchSheetData {
+  rating: number;
+  vibe_rating: number | null;
+  notes: string;
+  log_date: string;
+  photoUris: string[];
+  name?: string;
+}
+
 interface Props {
   visible: boolean;
   showVibeRating?: boolean;
@@ -113,7 +123,7 @@ interface Props {
   initialLogDate?: string;
   /** When set, shows an editable Name field (used when editing a dish). */
   initialName?: string;
-  onConfirm: (data: { rating: number; vibe_rating?: number; notes: string; log_date: string; photoUris: string[]; name?: string }) => void;
+  onConfirm: (data: MunchSheetData) => void;
   onClose: () => void;
   /** Called once the sheet has fully closed — safe to show an Alert or another sheet. */
   onDismissed?: () => void;
@@ -138,7 +148,8 @@ export function AddToMunchedSheet({ visible, showVibeRating = true, initialRatin
   const [pickerYear, setPickerYear] = useState(0);
 
   const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 6 }, (_, i) => String(currentYear - 5 + i));
+  const firstYear = Math.min(currentYear - 5, parseDate(initialLogDate ?? todayString()).year);
+  const years = Array.from({ length: currentYear - firstYear + 1 }, (_, i) => String(firstYear + i));
 
   useEffect(() => {
     if (visible) {
@@ -156,14 +167,15 @@ export function AddToMunchedSheet({ visible, showVibeRating = true, initialRatin
     }
   }, [visible]);
 
-  function commitPickerDate() {
-    const y = Number(years[pickerYear] ?? currentYear);
-    const m = pickerMonth;
-    const maxDay = daysInMonth(m, y);
-    const d = Math.min(pickerDay + 1, maxDay);
-    const iso = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    setLogDate(iso);
-    setShowDatePicker(false);
+  // The date follows the picker as it scrolls (Done only closes it), so Save
+  // never keeps an old date the picker no longer shows
+  function pickDate(month: number, dayIndex: number, yearIndex: number) {
+    setPickerMonth(month);
+    setPickerDay(dayIndex);
+    setPickerYear(yearIndex);
+    const y = Number(years[yearIndex] ?? currentYear);
+    const d = Math.min(dayIndex + 1, daysInMonth(month, y));
+    setLogDate(`${y}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
   }
 
   const numDays = daysInMonth(pickerMonth, Number(years[pickerYear] ?? currentYear));
@@ -180,7 +192,7 @@ export function AddToMunchedSheet({ visible, showVibeRating = true, initialRatin
     }
     onConfirm({
       rating,
-      vibe_rating: showVibeRating && vibeRating > 0 ? vibeRating : undefined,
+      vibe_rating: showVibeRating && vibeRating > 0 ? vibeRating : null,
       notes,
       log_date: logDate,
       photoUris,
@@ -230,7 +242,14 @@ export function AddToMunchedSheet({ visible, showVibeRating = true, initialRatin
 
           {showVibeRating && (
             <>
-              <Text style={[styles.label, { marginTop: 20 }]}>Vibe</Text>
+              <View style={styles.labelRow}>
+                <Text style={[styles.label, { marginTop: 20 }]}>Vibe</Text>
+                {vibeRating > 0 && (
+                  <TouchableOpacity onPress={() => setVibeRating(0)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Text style={styles.clear}>Clear</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
               <StarRating value={vibeRating} onChange={setVibeRating} size={36} />
             </>
           )}
@@ -251,21 +270,21 @@ export function AddToMunchedSheet({ visible, showVibeRating = true, initialRatin
                 <ScrollPicker
                   items={MONTHS}
                   selectedIndex={pickerMonth}
-                  onSelect={(i) => { setPickerMonth(i); }}
+                  onSelect={(i) => pickDate(i, pickerDay, pickerYear)}
                 />
                 <ScrollPicker
                   key={`day-${pickerMonth}-${pickerYear}`}
                   items={days}
                   selectedIndex={Math.min(pickerDay, days.length - 1)}
-                  onSelect={(i) => setPickerDay(i)}
+                  onSelect={(i) => pickDate(pickerMonth, i, pickerYear)}
                 />
                 <ScrollPicker
                   items={years}
                   selectedIndex={Math.max(0, pickerYear)}
-                  onSelect={(i) => setPickerYear(i)}
+                  onSelect={(i) => pickDate(pickerMonth, pickerDay, i)}
                 />
               </View>
-              <TouchableOpacity style={styles.doneBtn} onPress={commitPickerDate}>
+              <TouchableOpacity style={styles.doneBtn} onPress={() => setShowDatePicker(false)}>
                 <Text style={styles.doneBtnText}>Done</Text>
               </TouchableOpacity>
             </View>
@@ -314,6 +333,8 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.4 },
   body: { padding: 16 },
   label: { fontSize: 14, fontWeight: '600', color: '#444', marginBottom: 8 },
+  labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
+  clear: { fontSize: 14, color: '#FF6B35', fontWeight: '600', marginBottom: 8 },
   input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 12, fontSize: 15, minHeight: 100 },
   nameInput: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 12, fontSize: 15, marginBottom: 20 },
   photoRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 32 },

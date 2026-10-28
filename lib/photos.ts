@@ -45,6 +45,15 @@ export async function uploadLogPhotos(uris: string[], logType: LogType, logId: s
   }
 }
 
+/** Deletes one photo: its row first (so it disappears from the app), then its file. */
+export async function deletePhoto(photo: { id: string; storage_path: string }): Promise<void> {
+  const { data, error } = await supabase.from('photos').delete().eq('id', photo.id).select('id');
+  if (error) throw error;
+  if (!data || data.length === 0) throw new Error('This photo could not be deleted.');
+  const { error: storageError } = await supabase.storage.from('photos').remove([photo.storage_path]);
+  if (storageError) throw storageError;
+}
+
 /** Removes the photo files and rows for the given logs. Call before deleting the logs. */
 export async function deleteLogPhotos(logType: LogType, logIds: string[]): Promise<void> {
   if (logIds.length === 0) return;

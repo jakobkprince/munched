@@ -13,15 +13,17 @@ import { TAG_GROUPS } from '../constants/tags';
 
 interface Props {
   visible: boolean;
+  /** Tags already applied; they're hidden from the list */
   selectedTags: string[];
-  onAdd?: (tag: string) => void;
-  onClose: () => void;
-  // Pre-select initialTags in multi-select mode; Done calls onDone with final selection
+  /** Tags to start out selected */
   initialTags?: string[];
-  onDone?: (tags: string[]) => void;
+  /** Called with the chosen tags. The caller saves them and closes the sheet. */
+  onDone: (tags: string[]) => void;
+  onClose: () => void;
+  saving?: boolean;
 }
 
-export function TagPickerSheet({ visible, selectedTags, onAdd, onClose, initialTags, onDone }: Props) {
+export function TagPickerSheet({ visible, selectedTags, initialTags, onDone, onClose, saving }: Props) {
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState('');
   const [pending, setPending] = useState<Set<string>>(new Set());
@@ -49,14 +51,6 @@ export function TagPickerSheet({ visible, selectedTags, onAdd, onClose, initialT
     });
   }
 
-  function handleDone() {
-    if (onDone) {
-      onDone(Array.from(pending));
-    } else {
-      pending.forEach((tag) => onAdd?.(tag));
-      onClose();
-    }
-  }
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -92,7 +86,7 @@ export function TagPickerSheet({ visible, selectedTags, onAdd, onClose, initialT
           ))}
         </ScrollView>
         <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
-          <TouchableOpacity style={styles.doneBtn} onPress={handleDone} activeOpacity={0.85}>
+          <TouchableOpacity style={[styles.doneBtn, saving && styles.disabled]} onPress={() => onDone(Array.from(pending))} disabled={saving} activeOpacity={0.85}>
             <Text style={styles.doneBtnText}>Done</Text>
           </TouchableOpacity>
         </View>
@@ -115,4 +109,5 @@ const styles = StyleSheet.create({
   footer: { borderTopWidth: 1, borderTopColor: '#eee', paddingTop: 12, paddingHorizontal: 16 },
   doneBtn: { backgroundColor: '#FF6B35', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   doneBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  disabled: { opacity: 0.5 },
 });

@@ -11,8 +11,10 @@ interface Props {
 export function StarRating({ value, onChange, size = 24, color = '#FF6B35' }: Props) {
   function handlePress(star: number) {
     if (!onChange) return;
-    // Tapping the same whole-number star steps it down to a half star
-    onChange(value === star ? star - 0.5 : star);
+    // Tapping the same whole-number star steps it down to a half star; the
+    // first star clears instead (ratings start at 1 star, there is no ½)
+    if (value === star) onChange(star === 1 ? 0 : star - 0.5);
+    else onChange(star);
   }
 
   function iconName(star: number): 'star' | 'star-half' | 'star-outline' {

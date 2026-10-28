@@ -1,5 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
-import { useFocusEffect } from 'expo-router';
+import { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -19,16 +18,12 @@ import { SortPicker } from '../../../components/sort-picker';
 import { TagFilter, ClearTagsButton } from '../../../components/tag-filter';
 import { useSharedTagFilter } from '../../../hooks/use-shared-tag-filter';
 import {
-  SORT_FIELD_OPTIONS,
+  EAT_LIST_SORT_FIELDS,
   DEFAULT_SORT_DIRECTIONS,
-  DEFAULT_EAT_LIST_SORT,
-  EatListSortField,
+  SortField,
   SortDirection,
 } from '../../../constants/sort-options';
 import { EatListDishView } from '../../../types';
-
-// Dishes don't have vibe — exclude it
-const DISH_SORT_OPTIONS = SORT_FIELD_OPTIONS.filter((o) => o.value !== 'vibe');
 
 function EatListDishCard({ item }: { item: EatListDishView }) {
   const router = useRouter();
@@ -124,15 +119,13 @@ const cardStyles = StyleSheet.create({
 export default function EatListDishes() {
   const router = useRouter();
 
-  const [sortField, setSortField] = useState<EatListSortField>(DEFAULT_EAT_LIST_SORT.field);
-  const [sortDirection, setSortDirection] = useState<SortDirection>(DEFAULT_EAT_LIST_SORT.direction);
+  const [sortField, setSortField] = useState<SortField>('recency');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [tagFilter, setTagFilter] = useSharedTagFilter();
   const [search, setSearch] = useState('');
 
   const { location } = useLocation();
-  const { data, tagCounts, loading, error, refresh } = useEatListDishes(sortField, sortDirection, tagFilter, location);
-
-  useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
+  const { data, tagCounts, loading, error } = useEatListDishes(sortField, sortDirection, tagFilter, location);
 
   const filtered = useMemo<EatListDishView[]>(() => {
     if (!search.trim()) return data;
@@ -141,8 +134,8 @@ export default function EatListDishes() {
   }, [data, search]);
 
   function handleSortChange(value: string) {
-    setSortField(value as EatListSortField);
-    setSortDirection(DEFAULT_SORT_DIRECTIONS[value] ?? 'desc');
+    setSortField(value as SortField);
+    setSortDirection(DEFAULT_SORT_DIRECTIONS[value as SortField]);
   }
 
   return (
@@ -162,19 +155,19 @@ export default function EatListDishes() {
       <View style={styles.listWrapper}>
         {loading ? (
           <ActivityIndicator style={styles.spinner} color="#FF6B35" />
-        ) : error ? (
-          <Text style={styles.errorText}>{error}</Text>
         ) : (
           <FlatList
+            // A failed refresh keeps showing the last loaded list, with the error above it
+            ListHeaderComponent={error ? <Text style={styles.errorText}>{error}</Text> : undefined}
             data={filtered}
             keyExtractor={(item) => item.entry.id}
             renderItem={({ item }) => <EatListDishCard item={item} />}
             contentContainerStyle={styles.listContent}
-            ListEmptyComponent={
+            ListEmptyComponent={error ? undefined : (
               <Text style={styles.emptyText}>
                 {search.trim() ? 'No dishes match your search.' : 'No dishes on your Eat-List yet.'}
               </Text>
-            }
+            )}
             keyboardShouldPersistTaps="handled"
           />
         )}
@@ -213,7 +206,7 @@ export default function EatListDishes() {
 
         <View style={styles.filterRow}>
           <SortPicker
-            options={DISH_SORT_OPTIONS}
+            options={EAT_LIST_SORT_FIELDS}
             value={sortField}
             onChange={handleSortChange}
           />
@@ -277,7 +270,7 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#c00',
     textAlign: 'center',
-    marginTop: 40,
+    marginVertical: 16,
     paddingHorizontal: 24,
     fontSize: 14,
   },

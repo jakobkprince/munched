@@ -43,7 +43,7 @@ App for logging/rating restaurants and specific dishes you've tried (**Munched**
 - Added via **search** — user types a restaurant name, taps Search, and selects from the results list. If it isn't found, it can be **added manually** (name + optional address)
 - Populated automatically with: name, address, coordinates, website, Yelp link, Apple Maps link
 - Can be tagged with one or more cuisine/category tags
-- Rated 1–5 stars (overall) + 1–5 stars (vibe), half stars allowed
+- Rated 1–5 stars (overall) + 1–5 stars (vibe), half stars allowed (minimum 1 star; vibe is optional and can be cleared)
 - Can include notes, pictures, and a log date
 - Can be re-logged (re-munched) over time; new log takes precedence but full log history is viewable
 - Restaurant pages are always accessible as standalone references (populated from Google Places data) even if removed from a list
@@ -65,7 +65,8 @@ App for logging/rating restaurants and specific dishes you've tried (**Munched**
 - A single Text Search call returns all needed data: name, address, coordinates, website, and types — no separate Place Details call required
 - **Apple Maps link** constructed from coordinates/address (`https://maps.apple.com/?q=...`)
 - **Yelp link** constructed client-side as a search URL (`https://www.yelp.com/search?find_desc=Restaurant+Name&find_loc=Address`) — no API required
-- Google Places category data used to **auto-suggest relevant tags** on the restaurant
+- Google Places category data used to **auto-suggest relevant tags** on the restaurant (only when it's first saved, so removed tags stay removed)
+- Results already on your Eat-List or Munched are labeled
 
 ### Tags (Cuisine/Category)
 
@@ -96,7 +97,7 @@ Tags are selected via a searchable dropdown list. Grouped as follows:
 - Has an **"Add Dish" button** once the restaurant is in Eat-List or Munched:
   - Two options: **"Add to Eat-List"** or **"Add to Munched"**
   - Dish name is entered manually
-- Has an **"Add Tag" button** once the restaurant is in Eat-List or Munched (searchable dropdown)
+- Has an **"Add Tag" button** once the restaurant is in Eat-List or Munched (searchable dropdown). Tags added to a restaurant are also added to its dishes. Each tag has an × to remove it.
 - **3-dot menu** (top right corner):
   - **Eat-List items**: "Edit" and "Delete"
   - **Munched items**: "Edit", "Delete", and "View Previous Munches"
@@ -145,6 +146,7 @@ Tags are selected via a searchable dropdown list. Grouped as follows:
 ## Munched Item Display
 
 - **Default view** shows: most recent rating, most recent log date, ALL photos and notes (aggregated from all logs) with their log dates next to them, sorted by recency
+- Tapping a photo opens it full-screen (swipe between photos, pinch to zoom, see its date, delete it)
 - **"View Previous Munches"** (via 3-dot menu): a compact dropdown list sorted by recency showing just the rating and log date of each previous log. Clicking one opens that individual log's page with only its rating, date, notes, and photos. A back arrow (top left) returns to the dropdown, then back to the normal Munched view.
 
 ---
@@ -165,7 +167,7 @@ Restaurants and dishes you've logged.
   - Distance (both directions)
   - **Default sort**: rating, highest first
 - **Filterable** by tag(s)
-- Each entry displays: rating, notes, pictures, date logged
+- Each entry (restaurant or dish) displays: rating, notes, pictures, date logged
 - Clicking a restaurant shows its dishes; clicking a dish shows its restaurant
 
 ### 2. Eat-List
@@ -179,12 +181,13 @@ Restaurants and dishes you want to try.
   - Recency (both directions)
   - Distance (both directions)
   - **Default sort**: recency, most recent first
+  - (No rating/vibe sort: Eat-List items have no ratings)
 - **Filterable** by tag(s)
 - Can include notes
 
 ### 3. Map
 
-- Displays restaurant pins on a map
+- Displays restaurant pins on a map, plus your current location
 - **Toggle** between Eat-List restaurants (default) and Munched restaurants
 - **Tapping a pin** shows:
   - Eat-List view: restaurant name

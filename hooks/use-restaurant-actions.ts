@@ -4,7 +4,8 @@ import { Restaurant, RestaurantLogInput } from '../types';
 import { PLACES_TYPE_TO_TAG } from '../constants/tags';
 
 export function useRestaurantActions() {
-  async function upsertRestaurant(restaurant: Omit<Restaurant, 'id' | 'created_at'>): Promise<string> {
+  /** Saves a restaurant, or finds it if it's already saved. isNew: it was just added. */
+  async function upsertRestaurant(restaurant: Omit<Restaurant, 'id' | 'created_at'>): Promise<{ id: string; isNew: boolean }> {
     // Try insert first; if the restaurant already exists (unique conflict), select it instead.
     // Avoids upsert which triggers UPDATE RLS check.
     const { data: inserted, error: insertError } = await supabase
@@ -12,7 +13,7 @@ export function useRestaurantActions() {
       .insert(restaurant)
       .select('id')
       .single();
-    if (!insertError) return inserted.id;
+    if (!insertError) return { id: inserted.id, isNew: true };
 
     if (insertError.code === '23505') {
       const { data: existing, error: selectError } = await supabase
@@ -21,7 +22,7 @@ export function useRestaurantActions() {
         .eq('google_place_id', restaurant.google_place_id)
         .single();
       if (selectError) throw selectError;
-      return existing.id;
+      return { id: existing.id, isNew: false };
     }
     throw insertError;
   }

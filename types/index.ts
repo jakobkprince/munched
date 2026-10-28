@@ -111,7 +111,6 @@ export interface EatListRestaurantView {
   entry: EatListRestaurant;
   restaurant: Restaurant;
   tags: string[];
-  distanceKm?: number;
 }
 
 /** A dish as shown in the Eat-List tab */
@@ -125,7 +124,8 @@ export interface EatListDishView {
 /** Input for logging a restaurant (used in AddToMunchedSheet) */
 export interface RestaurantLogInput {
   rating: number;
-  vibe_rating?: number;
+  /** null = no vibe rating (clears it when editing) */
+  vibe_rating?: number | null;
   notes?: string;
   log_date: string;
   photoUris?: string[];

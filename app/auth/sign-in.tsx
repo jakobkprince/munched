@@ -10,7 +10,6 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
-import { Link } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 
 export default function SignIn() {
@@ -24,7 +23,7 @@ export default function SignIn() {
       return;
     }
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     setLoading(false);
     if (error) Alert.alert('Sign In Failed', error.message);
   }
@@ -68,9 +67,6 @@ export default function SignIn() {
           )}
         </TouchableOpacity>
 
-        <Link href="/auth/sign-up" style={styles.link}>
-          Don't have an account? Sign up
-        </Link>
       </View>
     </KeyboardAvoidingView>
   );
@@ -98,5 +94,4 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: { opacity: 0.6 },
   buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  link: { marginTop: 20, textAlign: 'center', color: '#FF6B35', fontSize: 15 },
 });

@@ -3,16 +3,29 @@ import { uploadLogPhotos, deleteLogPhotos } from '../lib/photos';
 import { DishLogInput } from '../types';
 
 export function useDishActions() {
-  async function addDish(restaurantId: string, name: string): Promise<string> {
-    const userId = await requireUserId();
-    const { data, error } = await supabase
-      .from('dishes')
-      .insert({ restaurant_id: restaurantId, user_id: userId, name })
-      .select('id')
-      .single();
+  /** Finds one of your dishes at this restaurant by name (ignoring case and spaces). */
+  async function findDish(restaurantId: string, name: string): Promise<string | null> {
+    const { data, error } = await supabase.from('dishes').select('id, name').eq('restaurant_id', restaurantId);
     if (error) throw error;
+    const wanted = name.trim().toLowerCase();
+    return data.find((d) => d.name.trim().toLowerCase() === wanted)?.id ?? null;
+  }
 
-    // New dishes inherit the restaurant's tags
+  /** Adds a dish to a restaurant, reusing a dish of the same name instead of making a duplicate. */
+  async function addDish(restaurantId: string, name: string): Promise<string> {
+    let dishId = await findDish(restaurantId, name);
+    if (!dishId) {
+      const userId = await requireUserId();
+      const { data, error } = await supabase
+        .from('dishes')
+        .insert({ restaurant_id: restaurantId, user_id: userId, name: name.trim() })
+        .select('id')
+        .single();
+      if (error) throw error;
+      dishId = data.id as string;
+    }
+
+    // Added dishes inherit the restaurant's tags
     const { data: restaurantTags, error: tagsError } = await supabase
       .from('restaurant_tags')
       .select('tag')
@@ -22,13 +35,13 @@ export function useDishActions() {
       const { error: upsertError } = await supabase
         .from('dish_tags')
         .upsert(
-          restaurantTags.map(({ tag }) => ({ dish_id: data.id, tag })),
+          restaurantTags.map(({ tag }) => ({ dish_id: dishId, tag })),
           { onConflict: 'dish_id,tag', ignoreDuplicates: true }
         );
       if (upsertError) throw upsertError;
     }
 
-    return data.id;
+    return dishId;
   }
 
   async function addToEatList(dishId: string, notes?: string): Promise<void> {
@@ -99,6 +112,22 @@ export function useDishActions() {
     if (!data || data.length === 0) throw new Error('This dish could not be deleted.');
   }
 
+  /**
+   * A dish that's on neither list can't be seen anywhere, so delete it once it
+   * leaves its last list. Returns true if it was deleted.
+   */
+  async function deleteDishIfUnused(dishId: string): Promise<boolean> {
+    const [logsRes, eatListRes] = await Promise.all([
+      supabase.from('dish_logs').select('id').eq('dish_id', dishId).limit(1),
+      supabase.from('eat_list_dishes').select('id').eq('dish_id', dishId).limit(1),
+    ]);
+    if (logsRes.error) throw logsRes.error;
+    if (eatListRes.error) throw eatListRes.error;
+    if (logsRes.data.length > 0 || eatListRes.data.length > 0) return false;
+    await deleteDish(dishId);
+    return true;
+  }
+
   async function deleteFromEatList(id: string): Promise<void> {
     const { error } = await supabase.from('eat_list_dishes').delete().eq('id', id);
     if (error) throw error;
@@ -139,5 +168,5 @@ export function useDishActions() {
     }
   }
 
-  return { addDish, addToEatList, addToMunched, reMunch, renameDish, deleteDish, deleteFromEatList, deleteLog, deleteAllLogs, editEatListEntry, editDishLog };
+  return { findDish, addDish, addToEatList, addToMunched, reMunch, renameDish, deleteDish, deleteDishIfUnused, deleteFromEatList, deleteLog, deleteAllLogs, editEatListEntry, editDishLog };
 }

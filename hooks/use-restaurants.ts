@@ -1,8 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { supabase } from '../lib/supabase';
-import { Restaurant, MunchedRestaurant, EatListRestaurantView, RestaurantStatus, RestaurantLog, Photo } from '../types';
-import { MunchedRestaurantSortField, EatListSortField, SortDirection } from '../constants/sort-options';
+import { countTags, filterByTags, photosByLog } from '../lib/lists';
+import { Restaurant, MunchedRestaurant, EatListRestaurantView, RestaurantStatus, RestaurantLog } from '../types';
+import { SortField, SortDirection } from '../constants/sort-options';
 import { distanceTo, compareDistance } from './use-location';
+import { useFocusedQuery } from './use-focused-query';
 import { Coordinates } from '../types';
 
 export function useRestaurant(id: string) {
@@ -23,13 +26,16 @@ export function useRestaurant(id: string) {
         supabase.from('restaurant_tags').select('tag').eq('restaurant_id', id),
       ]);
       if (restaurantRes.error) throw restaurantRes.error;
+      if (eatListRes.error) throw eatListRes.error;
+      if (logsRes.error) throw logsRes.error;
+      if (tagsRes.error) throw tagsRes.error;
       setRestaurant(restaurantRes.data);
       setStatus({
         inEatList: !!eatListRes.data,
-        inMunched: (logsRes.data?.length ?? 0) > 0,
+        inMunched: logsRes.data.length > 0,
         eatListEntry: eatListRes.data ?? null,
       });
-      setTags((tagsRes.data ?? []).map((t) => t.tag));
+      setTags(tagsRes.data.map((t) => t.tag));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load restaurant');
     } finally {
@@ -37,162 +43,108 @@ export function useRestaurant(id: string) {
     }
   }, [id]);
 
-  useEffect(() => { fetch(); }, [fetch]);
+  // Reload on return, e.g. after the restaurant was munched from one of its dishes
+  useFocusEffect(useCallback(() => { fetch(); }, [fetch]));
 
   return { restaurant, status, tags, loading, error, refresh: fetch };
 }
 
+// Restaurant rows embed their tags; split them back out
+type RestaurantWithTags = Restaurant & { restaurant_tags: { tag: string }[] };
+
+function splitTags({ restaurant_tags, ...restaurant }: RestaurantWithTags): { restaurant: Restaurant; tags: string[] } {
+  return { restaurant, tags: restaurant_tags.map((t) => t.tag) };
+}
+
+async function loadMunchedRestaurants(): Promise<MunchedRestaurant[]> {
+  const [logsRes, photosRes] = await Promise.all([
+    supabase
+      .from('restaurant_logs')
+      .select('*, restaurant:restaurants(*, restaurant_tags(tag))')
+      .order('log_date', { ascending: false })
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('photos')
+      .select('*')
+      .eq('log_type', 'restaurant_log')
+      .order('created_at', { ascending: false }),
+  ]);
+  if (logsRes.error) throw logsRes.error;
+  if (photosRes.error) throw photosRes.error;
+
+  // Group logs by restaurant (newest first, so logs[0] is the latest)
+  const byRestaurant = new Map<string, { restaurant: RestaurantWithTags; logs: RestaurantLog[] }>();
+  for (const { restaurant, ...log } of logsRes.data) {
+    const existing = byRestaurant.get(log.restaurant_id);
+    if (existing) existing.logs.push(log);
+    else byRestaurant.set(log.restaurant_id, { restaurant, logs: [log] });
+  }
+
+  const photos = photosByLog(photosRes.data);
+  return Array.from(byRestaurant.values()).map(({ restaurant, logs }) => ({
+    ...splitTags(restaurant),
+    latestLog: logs[0],
+    allLogs: logs,
+    // Photos from the most recent visit come first
+    photos: logs.flatMap((l) => photos.get(l.id) ?? []),
+  }));
+}
+
 export function useMunchedRestaurants(
-  sortField: MunchedRestaurantSortField,
+  sortField: SortField,
   sortDirection: SortDirection,
   tagFilter: string[],
   userLocation: Coordinates | null
 ) {
-  const [data, setData] = useState<MunchedRestaurant[]>([]);
-  const [tagCounts, setTagCounts] = useState<Record<string, number>>({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: all, loading, error, refresh } = useFocusedQuery(loadMunchedRestaurants);
+  const tagCounts = useMemo(() => countTags(all ?? []), [all]);
 
-  const fetch = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { data: logs, error: logsErr } = await supabase
-        .from('restaurant_logs')
-        .select('*, restaurant:restaurants(*)')
-        .order('log_date', { ascending: false })
-        .order('created_at', { ascending: false });
-      if (logsErr) throw logsErr;
-
-      // Group logs by restaurant_id
-      const byRestaurant = new Map<string, { restaurant: Restaurant; logs: RestaurantLog[] }>();
-      for (const log of logs ?? []) {
-        const existing = byRestaurant.get(log.restaurant_id);
-        if (existing) {
-          existing.logs.push(log);
-        } else {
-          byRestaurant.set(log.restaurant_id, { restaurant: log.restaurant, logs: [log] });
-        }
+  const data = useMemo(() => {
+    const dir = sortDirection === 'asc' ? 1 : -1;
+    return [...filterByTags(all ?? [], tagFilter)].sort((a, b) => {
+      switch (sortField) {
+        case 'rating': return dir * ((a.latestLog.rating ?? 0) - (b.latestLog.rating ?? 0));
+        case 'vibe': return dir * ((a.latestLog.vibe_rating ?? 0) - (b.latestLog.vibe_rating ?? 0));
+        case 'recency': return dir * a.latestLog.log_date.localeCompare(b.latestLog.log_date);
+        case 'distance':
+          return compareDistance(distanceTo(userLocation, a.restaurant), distanceTo(userLocation, b.restaurant), dir);
       }
+    });
+  }, [all, tagFilter, sortField, sortDirection, userLocation]);
 
-      const restaurantIds = Array.from(byRestaurant.keys());
-      if (restaurantIds.length === 0) { setData([]); setTagCounts({}); return; }
+  return { data, tagCounts, loading, error, refresh };
+}
 
-      const [photosRes, tagsRes] = await Promise.all([
-        supabase.from('photos').select('*').eq('log_type', 'restaurant_log').in('log_id', logs?.map(l => l.id) ?? []),
-        supabase.from('restaurant_tags').select('*').in('restaurant_id', restaurantIds),
-      ]);
-
-      let result: MunchedRestaurant[] = Array.from(byRestaurant.values()).map(({ restaurant, logs }) => ({
-        restaurant,
-        latestLog: logs[0],
-        allLogs: logs,
-        photos: (photosRes.data ?? []).filter((p) => logs.some((l) => l.id === p.log_id)),
-        tags: (tagsRes.data ?? []).filter((t) => t.restaurant_id === restaurant.id).map((t) => t.tag),
-      }));
-
-      // Compute tag counts before filtering
-      const counts: Record<string, number> = {};
-      for (const item of result) {
-        for (const tag of item.tags) {
-          counts[tag] = (counts[tag] ?? 0) + 1;
-        }
-      }
-      setTagCounts(counts);
-
-      // Filter by tags
-      if (tagFilter.length > 0) {
-        result = result.filter((r) => tagFilter.some((t) => r.tags.includes(t)));
-      }
-
-      // Sort
-      result.sort((a, b) => {
-        const dir = sortDirection === 'asc' ? 1 : -1;
-        switch (sortField) {
-          case 'rating': return dir * ((a.latestLog.rating ?? 0) - (b.latestLog.rating ?? 0));
-          case 'vibe': return dir * ((a.latestLog.vibe_rating ?? 0) - (b.latestLog.vibe_rating ?? 0));
-          case 'recency': return dir * (new Date(a.latestLog.log_date).getTime() - new Date(b.latestLog.log_date).getTime());
-          case 'distance':
-            return compareDistance(distanceTo(userLocation, a.restaurant), distanceTo(userLocation, b.restaurant), dir);
-        }
-      });
-
-      setData(result);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load');
-    } finally {
-      setLoading(false);
-    }
-  }, [sortField, sortDirection, tagFilter, userLocation]);
-
-  useEffect(() => { fetch(); }, [fetch]);
-
-  return { data, tagCounts, loading, error, refresh: fetch };
+async function loadEatListRestaurants(): Promise<EatListRestaurantView[]> {
+  const { data, error } = await supabase
+    .from('eat_list_restaurants')
+    .select('*, restaurant:restaurants(*, restaurant_tags(tag))')
+    .order('date_added', { ascending: false });
+  if (error) throw error;
+  return data.map((row) => {
+    const { restaurant, tags } = splitTags(row.restaurant);
+    return { entry: { ...row, restaurant }, restaurant, tags };
+  });
 }
 
 export function useEatListRestaurants(
-  sortField: EatListSortField,
+  sortField: SortField,
   sortDirection: SortDirection,
   tagFilter: string[],
   userLocation: Coordinates | null
 ) {
-  const [data, setData] = useState<EatListRestaurantView[]>([]);
-  const [tagCounts, setTagCounts] = useState<Record<string, number>>({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: all, loading, error, refresh } = useFocusedQuery(loadEatListRestaurants);
+  const tagCounts = useMemo(() => countTags(all ?? []), [all]);
 
-  const fetch = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { data: entries, error: err } = await supabase
-        .from('eat_list_restaurants')
-        .select('*, restaurant:restaurants(*)')
-        .order('date_added', { ascending: false });
-      if (err) throw err;
-
-      const restaurantIds = (entries ?? []).map((e) => e.restaurant_id);
-      const tagsRes = restaurantIds.length > 0
-        ? await supabase.from('restaurant_tags').select('*').in('restaurant_id', restaurantIds)
-        : { data: [] };
-
-      let result: EatListRestaurantView[] = (entries ?? []).map((entry) => ({
-        entry,
-        restaurant: entry.restaurant,
-        tags: (tagsRes.data ?? []).filter((t) => t.restaurant_id === entry.restaurant_id).map((t) => t.tag),
-        distanceKm: distanceTo(userLocation, entry.restaurant) ?? undefined,
-      }));
-
-      // Compute tag counts before filtering
-      const counts: Record<string, number> = {};
-      for (const item of result) {
-        for (const tag of item.tags) {
-          counts[tag] = (counts[tag] ?? 0) + 1;
-        }
+  const data = useMemo(() => {
+    const dir = sortDirection === 'asc' ? 1 : -1;
+    return [...filterByTags(all ?? [], tagFilter)].sort((a, b) => {
+      if (sortField === 'distance') {
+        return compareDistance(distanceTo(userLocation, a.restaurant), distanceTo(userLocation, b.restaurant), dir);
       }
-      setTagCounts(counts);
+      return dir * a.entry.date_added.localeCompare(b.entry.date_added);
+    });
+  }, [all, tagFilter, sortField, sortDirection, userLocation]);
 
-      if (tagFilter.length > 0) {
-        result = result.filter((r) => tagFilter.some((t) => r.tags.includes(t)));
-      }
-
-      result.sort((a, b) => {
-        const dir = sortDirection === 'asc' ? 1 : -1;
-        if (sortField === 'recency') return dir * (new Date(a.entry.date_added).getTime() - new Date(b.entry.date_added).getTime());
-        if (sortField === 'distance') return compareDistance(a.distanceKm ?? null, b.distanceKm ?? null, dir);
-        // rating/vibe not applicable to eat-list entries
-        return 0;
-      });
-
-      setData(result);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load');
-    } finally {
-      setLoading(false);
-    }
-  }, [sortField, sortDirection, tagFilter, userLocation]);
-
-  useEffect(() => { fetch(); }, [fetch]);
-
-  return { data, tagCounts, loading, error, refresh: fetch };
+  return { data, tagCounts, loading, error, refresh };
 }

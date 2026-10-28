@@ -1,5 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
-import { useFocusEffect } from 'expo-router';
+import { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -20,10 +19,9 @@ import { SortPicker } from '../../../components/sort-picker';
 import { TagFilter, ClearTagsButton } from '../../../components/tag-filter';
 import { useSharedTagFilter } from '../../../hooks/use-shared-tag-filter';
 import {
-  SORT_FIELD_OPTIONS,
+  MUNCHED_RESTAURANT_SORT_FIELDS,
   DEFAULT_SORT_DIRECTIONS,
-  DEFAULT_MUNCHED_RESTAURANT_SORT,
-  MunchedRestaurantSortField,
+  SortField,
   SortDirection,
 } from '../../../constants/sort-options';
 import { MunchedRestaurant } from '../../../types';
@@ -31,15 +29,13 @@ import { MunchedRestaurant } from '../../../types';
 export default function MunchedRestaurants() {
   const router = useRouter();
 
-  const [sortField, setSortField] = useState<MunchedRestaurantSortField>(DEFAULT_MUNCHED_RESTAURANT_SORT.field);
-  const [sortDirection, setSortDirection] = useState<SortDirection>(DEFAULT_MUNCHED_RESTAURANT_SORT.direction);
+  const [sortField, setSortField] = useState<SortField>('rating');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [tagFilter, setTagFilter] = useSharedTagFilter();
   const [search, setSearch] = useState('');
 
   const { location } = useLocation();
-  const { data, tagCounts, loading, error, refresh } = useMunchedRestaurants(sortField, sortDirection, tagFilter, location);
-
-  useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
+  const { data, tagCounts, loading, error } = useMunchedRestaurants(sortField, sortDirection, tagFilter, location);
 
   const filtered = useMemo<MunchedRestaurant[]>(() => {
     if (!search.trim()) return data;
@@ -48,8 +44,8 @@ export default function MunchedRestaurants() {
   }, [data, search]);
 
   function handleSortChange(value: string) {
-    setSortField(value as MunchedRestaurantSortField);
-    setSortDirection(DEFAULT_SORT_DIRECTIONS[value] ?? 'desc');
+    setSortField(value as SortField);
+    setSortDirection(DEFAULT_SORT_DIRECTIONS[value as SortField]);
   }
 
   return (
@@ -69,19 +65,19 @@ export default function MunchedRestaurants() {
       <View style={styles.listWrapper}>
         {loading ? (
           <ActivityIndicator style={styles.spinner} color="#FF6B35" />
-        ) : error ? (
-          <Text style={styles.errorText}>{error}</Text>
         ) : (
           <FlatList
+            // A failed refresh keeps showing the last loaded list, with the error above it
+            ListHeaderComponent={error ? <Text style={styles.errorText}>{error}</Text> : undefined}
             data={filtered}
             keyExtractor={(item) => item.restaurant.id}
             renderItem={({ item }) => <RestaurantCard item={item} />}
             contentContainerStyle={styles.listContent}
-            ListEmptyComponent={
+            ListEmptyComponent={error ? undefined : (
               <Text style={styles.emptyText}>
                 {search.trim() ? 'No restaurants match your search.' : 'No munched restaurants yet.'}
               </Text>
-            }
+            )}
             keyboardShouldPersistTaps="handled"
           />
         )}
@@ -113,7 +109,7 @@ export default function MunchedRestaurants() {
 
         <View style={styles.filterRow}>
           <SortPicker
-            options={SORT_FIELD_OPTIONS}
+            options={MUNCHED_RESTAURANT_SORT_FIELDS}
             value={sortField}
             onChange={handleSortChange}
           />
@@ -179,7 +175,7 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#c00',
     textAlign: 'center',
-    marginTop: 40,
+    marginVertical: 16,
     paddingHorizontal: 24,
     fontSize: 14,
   },

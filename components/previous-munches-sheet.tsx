@@ -8,6 +8,7 @@ import { RestaurantLog, DishLog, Photo } from '../types';
 import { StarRating } from './star-rating';
 import { NoteText } from './note-text';
 import { photoUrl } from '../lib/photos';
+import { PhotoViewer } from './photo-viewer';
 
 type Log = RestaurantLog | DishLog;
 
@@ -17,10 +18,13 @@ interface Props {
   photos: Photo[];
   onClose: () => void;
   onDeleteLog?: (logId: string) => Promise<void>;
+  /** Called after a photo is deleted, so the page can reload its photos */
+  onPhotoDeleted: () => void;
 }
 
-export function PreviousMunchesSheet({ visible, logs, photos, onClose, onDeleteLog }: Props) {
+export function PreviousMunchesSheet({ visible, logs, photos, onClose, onDeleteLog, onPhotoDeleted }: Props) {
   const [selectedLog, setSelectedLog] = useState<Log | null>(null);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   // Reset detail view whenever the sheet is closed
   useEffect(() => {
@@ -69,12 +73,10 @@ export function PreviousMunchesSheet({ visible, logs, photos, onClose, onDeleteL
 
               {logPhotos.length > 0 && (
                 <View style={styles.photoGrid}>
-                  {logPhotos.map((photo) => (
-                    <Image
-                      key={photo.id}
-                      source={{ uri: photoUrl(photo.storage_path) }}
-                      style={styles.photo}
-                    />
+                  {logPhotos.map((photo, i) => (
+                    <TouchableOpacity key={photo.id} onPress={() => setViewerIndex(i)} activeOpacity={0.8}>
+                      <Image source={{ uri: photoUrl(photo.storage_path) }} style={styles.photo} />
+                    </TouchableOpacity>
                   ))}
                 </View>
               )}
@@ -93,8 +95,12 @@ export function PreviousMunchesSheet({ visible, logs, photos, onClose, onDeleteL
                       { text: 'Cancel', style: 'cancel' },
                       {
                         text: 'Delete', style: 'destructive', onPress: async () => {
-                          await onDeleteLog(selectedLog!.id);
-                          setSelectedLog(null);
+                          try {
+                            await onDeleteLog(selectedLog!.id);
+                            setSelectedLog(null);
+                          } catch (e) {
+                            Alert.alert('Error', e instanceof Error ? e.message : 'Failed to delete munch');
+                          }
                         },
                       },
                     ]);
@@ -150,6 +156,13 @@ export function PreviousMunchesSheet({ visible, logs, photos, onClose, onDeleteL
           </>
         )}
       </View>
+      <PhotoViewer
+        photos={logPhotos}
+        startIndex={viewerIndex}
+        logDates={selectedLog ? { [selectedLog.id]: selectedLog.log_date } : undefined}
+        onClose={() => setViewerIndex(null)}
+        onDeleted={onPhotoDeleted}
+      />
     </Modal>
   );
 }

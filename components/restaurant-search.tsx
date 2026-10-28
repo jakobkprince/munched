@@ -27,6 +27,25 @@ interface PlaceResult {
   types: string[];
 }
 
+// Where a search result already is in your lists
+type SavedStatus = 'munched' | 'eat-list';
+
+/** Looks up which of these Google places are already on your Eat-List or Munched. */
+async function lookUpSavedStatus(placeIds: string[]): Promise<Record<string, SavedStatus>> {
+  if (placeIds.length === 0) return {};
+  const { data, error } = await supabase
+    .from('restaurants')
+    .select('google_place_id, eat_list_restaurants(id), restaurant_logs(id)')
+    .in('google_place_id', placeIds);
+  if (error) throw error;
+  const status: Record<string, SavedStatus> = {};
+  for (const r of data) {
+    if (r.restaurant_logs.length > 0) status[r.google_place_id] = 'munched';
+    else if (r.eat_list_restaurants.length > 0) status[r.google_place_id] = 'eat-list';
+  }
+  return status;
+}
+
 interface Props {
   onRestaurantSelected: (restaurantId: string) => void;
   placeholder?: string;
@@ -35,6 +54,7 @@ interface Props {
 export function RestaurantSearch({ onRestaurantSelected, placeholder = 'Search for a restaurant...' }: Props) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<PlaceResult[]>([]);
+  const [savedStatus, setSavedStatus] = useState<Record<string, SavedStatus>>({});
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [manualVisible, setManualVisible] = useState(false);
@@ -57,7 +77,14 @@ export function RestaurantSearch({ onRestaurantSelected, placeholder = 'Search f
       }
       const { data, error } = await supabase.functions.invoke('places-text-search', { body });
       if (error) throw error;
-      setResults(data.places ?? []);
+      const places: PlaceResult[] = data.places ?? [];
+      // The "already saved" labels are a nice-to-have: show the results even if this fails
+      const status = await lookUpSavedStatus(places.map((p) => p.id)).catch((e) => {
+        console.warn('Could not check which results are saved:', e);
+        return {};
+      });
+      setSavedStatus(status);
+      setResults(places);
       setHasSearched(true);
     } catch (e: unknown) {
       let msg = 'Unknown error';
@@ -90,7 +117,7 @@ export function RestaurantSearch({ onRestaurantSelected, placeholder = 'Search f
         : `https://maps.apple.com/?q=${encodeURIComponent(name)}`;
       const yelpUrl = `https://www.yelp.com/search?find_desc=${encodeURIComponent(name)}&find_loc=${encodeURIComponent(address ?? '')}`;
 
-      const restaurantId = await upsertRestaurant({
+      const { id: restaurantId } = await upsertRestaurant({
         google_place_id: placeId,
         name,
         address,
@@ -114,9 +141,6 @@ export function RestaurantSearch({ onRestaurantSelected, placeholder = 'Search f
 
   async function selectPlace(place: PlaceResult) {
     setLoading(true);
-    setResults([]);
-    setQuery('');
-
     try {
       const appleMapsUrl = place.lat && place.lng
         ? `https://maps.apple.com/?q=${encodeURIComponent(place.name)}&ll=${place.lat},${place.lng}`
@@ -124,7 +148,7 @@ export function RestaurantSearch({ onRestaurantSelected, placeholder = 'Search f
 
       const yelpUrl = `https://www.yelp.com/search?find_desc=${encodeURIComponent(place.name)}&find_loc=${encodeURIComponent(place.address ?? '')}`;
 
-      const restaurantId = await upsertRestaurant({
+      const { id: restaurantId, isNew } = await upsertRestaurant({
         google_place_id: place.id,
         name: place.name,
         address: place.address,
@@ -135,13 +159,17 @@ export function RestaurantSearch({ onRestaurantSelected, placeholder = 'Search f
         yelp_url: yelpUrl,
       });
 
-      if (place.types.length > 0) {
+      // Only tag a restaurant the first time it's saved, so tags you removed don't come back
+      if (isNew && place.types.length > 0) {
         await autoSuggestTags(restaurantId, place.types);
       }
 
+      setResults([]);
+      setQuery('');
       onRestaurantSelected(restaurantId);
     } catch (e) {
       console.error('Place select error:', e);
+      Alert.alert('Error', e instanceof Error ? e.message : 'Could not open this restaurant. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -166,9 +194,16 @@ export function RestaurantSearch({ onRestaurantSelected, placeholder = 'Search f
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.listContent}
         renderItem={({ item }) => (
-          <TouchableOpacity style={styles.result} onPress={() => selectPlace(item)}>
-            <Text style={styles.resultName}>{item.name}</Text>
-            {item.address && <Text style={styles.resultAddress}>{item.address}</Text>}
+          <TouchableOpacity style={styles.result} onPress={() => selectPlace(item)} disabled={loading}>
+            <View style={styles.resultText}>
+              <Text style={styles.resultName}>{item.name}</Text>
+              {item.address && <Text style={styles.resultAddress}>{item.address}</Text>}
+            </View>
+            {savedStatus[item.id] && (
+              <View style={styles.savedBadge}>
+                <Text style={styles.savedBadgeText}>{savedStatus[item.id] === 'munched' ? 'Munched' : 'Eat-List'}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         )}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
@@ -252,7 +287,10 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginVertical: 8,
   },
-  result: { paddingHorizontal: 16, paddingVertical: 12 },
+  result: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12 },
+  resultText: { flex: 1 },
+  savedBadge: { backgroundColor: '#fff3ee', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 },
+  savedBadgeText: { fontSize: 12, fontWeight: '600', color: '#FF6B35' },
   resultName: { fontSize: 15, fontWeight: '600', color: '#1a1a1a' },
   resultAddress: { fontSize: 13, color: '#666', marginTop: 2 },
   separator: { height: 1, backgroundColor: '#eee', marginLeft: 16 },

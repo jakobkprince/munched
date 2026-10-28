@@ -1,16 +1,24 @@
 import { useState, useEffect } from 'react';
+import { AppState } from 'react-native';
 import * as Location from 'expo-location';
 import { Coordinates } from '../types';
 
-// Location is looked up once per app session and shared by every screen.
-let locationPromise: Promise<Coordinates | null> | null = null;
+// Location is shared by every screen. It's looked up when first needed and again
+// whenever the app comes back to the foreground after a while, because iOS can
+// keep the app open for days (e.g. across a trip).
+const MAX_AGE_MS = 5 * 60 * 1000;
+
+let current: Coordinates | null = null;
+let lookedUpAt = 0;
+let pending: Promise<void> | null = null;
+const listeners = new Set<(location: Coordinates) => void>();
 
 async function lookUpLocation(): Promise<Coordinates | null> {
   try {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') return null;
     const loc =
-      (await Location.getLastKnownPositionAsync()) ??
+      (await Location.getLastKnownPositionAsync({ maxAge: MAX_AGE_MS })) ??
       (await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }));
     return { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
   } catch (e) {
@@ -19,19 +27,33 @@ async function lookUpLocation(): Promise<Coordinates | null> {
   }
 }
 
+function refreshIfStale() {
+  if (pending || Date.now() - lookedUpAt < MAX_AGE_MS) return;
+  pending = lookUpLocation()
+    .then((loc) => {
+      lookedUpAt = Date.now();
+      if (!loc) return;
+      current = loc;
+      listeners.forEach((listener) => listener(loc));
+    })
+    .finally(() => { pending = null; });
+}
+
+AppState.addEventListener('change', (state) => {
+  if (state === 'active' && listeners.size > 0) refreshIfStale();
+});
+
 export function useLocation() {
-  const [location, setLocation] = useState<Coordinates | null>(null);
+  const [location, setLocation] = useState<Coordinates | null>(current);
 
   useEffect(() => {
-    let active = true;
-    locationPromise ??= lookUpLocation();
-    locationPromise.then((loc) => {
-      if (active) setLocation(loc);
-    });
-    return () => { active = false; };
+    listeners.add(setLocation);
+    if (current) setLocation(current);
+    refreshIfStale();
+    return () => { listeners.delete(setLocation); };
   }, []);
 
-  return { location, permissionGranted: location !== null };
+  return { location };
 }
 
 export function getDistanceKm(a: Coordinates, b: Coordinates): number {

@@ -1,11 +1,24 @@
 import { supabase } from '../lib/supabase';
 
 export function useTags() {
-  async function addRestaurantTag(restaurantId: string, tag: string): Promise<void> {
+  /** Tags a restaurant, and also every dish you've added there. */
+  async function addRestaurantTags(restaurantId: string, tags: string[]): Promise<void> {
+    if (tags.length === 0) return;
     const { error } = await supabase
       .from('restaurant_tags')
-      .upsert({ restaurant_id: restaurantId, tag }, { onConflict: 'restaurant_id,tag', ignoreDuplicates: true });
+      .upsert(tags.map((tag) => ({ restaurant_id: restaurantId, tag })), { onConflict: 'restaurant_id,tag', ignoreDuplicates: true });
     if (error) throw error;
+
+    const { data: dishes, error: dishesError } = await supabase.from('dishes').select('id').eq('restaurant_id', restaurantId);
+    if (dishesError) throw dishesError;
+    if (dishes.length === 0) return;
+    const { error: dishTagsError } = await supabase
+      .from('dish_tags')
+      .upsert(
+        dishes.flatMap((d) => tags.map((tag) => ({ dish_id: d.id, tag }))),
+        { onConflict: 'dish_id,tag', ignoreDuplicates: true }
+      );
+    if (dishTagsError) throw dishTagsError;
   }
 
   async function removeRestaurantTag(restaurantId: string, tag: string): Promise<void> {
@@ -17,21 +30,23 @@ export function useTags() {
     if (error) throw error;
   }
 
-  async function addDishTag(dishId: string, tag: string): Promise<void> {
+  async function addDishTags(dishId: string, tags: string[]): Promise<void> {
+    if (tags.length === 0) return;
     const { error } = await supabase
       .from('dish_tags')
-      .upsert({ dish_id: dishId, tag }, { onConflict: 'dish_id,tag', ignoreDuplicates: true });
+      .upsert(tags.map((tag) => ({ dish_id: dishId, tag })), { onConflict: 'dish_id,tag', ignoreDuplicates: true });
     if (error) throw error;
   }
 
-  async function removeDishTag(dishId: string, tag: string): Promise<void> {
+  async function removeDishTags(dishId: string, tags: string[]): Promise<void> {
+    if (tags.length === 0) return;
     const { error } = await supabase
       .from('dish_tags')
       .delete()
       .eq('dish_id', dishId)
-      .eq('tag', tag);
+      .in('tag', tags);
     if (error) throw error;
   }
 
-  return { addRestaurantTag, removeRestaurantTag, addDishTag, removeDishTag };
+  return { addRestaurantTags, removeRestaurantTag, addDishTags, removeDishTags };
 }

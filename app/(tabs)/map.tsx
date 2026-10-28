@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,7 @@ import {
   ScrollView,
 } from 'react-native';
 import MapView, { Marker, Callout } from 'react-native-maps';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useLocation } from '@/hooks/use-location';
 import { useMunchedRestaurants } from '@/hooks/use-restaurants';
 import { useEatListRestaurants } from '@/hooks/use-restaurants';
@@ -39,25 +39,11 @@ export default function MapScreen() {
   const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [ratingFilter, setRatingFilter] = useState<RatingFilter>('all');
 
-  const { data: munchedData, refresh: refreshMunched } = useMunchedRestaurants(
-    'recency',
-    'desc',
-    tagFilter,
-    null
-  );
-
-  const { data: eatListData, refresh: refreshEatList } = useEatListRestaurants(
-    'recency',
-    'desc',
-    tagFilter,
-    null
-  );
-
-  // Pick up restaurants added or logged elsewhere in the app
-  useFocusEffect(useCallback(() => {
-    refreshMunched();
-    refreshEatList();
-  }, [refreshMunched, refreshEatList]));
+  // Both lists reload whenever the Map comes into focus
+  const munched = useMunchedRestaurants('recency', 'desc', tagFilter, null);
+  const eatList = useEatListRestaurants('recency', 'desc', tagFilter, null);
+  const munchedData = munched.data;
+  const eatListData = eatList.data;
 
   const mapRegion = useMemo(() => {
     const center = location ?? DEFAULT_LOCATION;
@@ -90,7 +76,7 @@ export default function MapScreen() {
 
   return (
     <View style={styles.container}>
-      <MapView style={styles.map} initialRegion={mapRegion}>
+      <MapView style={styles.map} initialRegion={mapRegion} showsUserLocation>
         {viewMode === 'eat-list' &&
           eatListMarkers.map((item) => (
             <Marker
@@ -168,7 +154,11 @@ export default function MapScreen() {
 
         {/* Tag filter + FAB */}
         <View style={styles.tagFilterRow}>
-          <TagFilter selectedTags={tagFilter} onChange={setTagFilter} />
+          <TagFilter
+            selectedTags={tagFilter}
+            onChange={setTagFilter}
+            tagCounts={viewMode === 'munched' ? munched.tagCounts : eatList.tagCounts}
+          />
           <TouchableOpacity style={styles.fab} onPress={() => router.push('/search')} activeOpacity={0.85}>
             <Text style={styles.fabIcon}>+</Text>
           </TouchableOpacity>
