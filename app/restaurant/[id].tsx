@@ -415,7 +415,7 @@ export default function RestaurantPage() {
         )}
       </View>
 
-      {/* Links row 2: Yelp + Infatuation */}
+      {/* Links row 2: Yelp + Infatuation + DoorDash */}
       <View style={[styles.linksRow, styles.linksRowLast]}>
         {restaurant.yelp_url && (
           <TouchableOpacity style={styles.linkBtn} onPress={() => Linking.openURL(restaurant.yelp_url!)}>
@@ -428,6 +428,14 @@ export default function RestaurantPage() {
         >
           <Ionicons name="megaphone" size={15} color="#FF6B35" />
           <Text style={styles.infatuationText}>Infatuation</Text>
+        </TouchableOpacity>
+        {/* Opens in the DoorDash app when installed, using the saved delivery address */}
+        <TouchableOpacity
+          style={styles.linkBtn}
+          onPress={() => Linking.openURL(`https://www.doordash.com/search/store/${encodeURIComponent(restaurant.name)}/`)}
+        >
+          <Ionicons name="bicycle" size={16} color="#FF6B35" />
+          <Text style={styles.linkText}>DoorDash</Text>
         </TouchableOpacity>
       </View>
 
@@ -692,7 +700,7 @@ const styles = StyleSheet.create({
   name: { fontSize: 24, fontWeight: '700', flex: 1, marginRight: 12 },
   address: { fontSize: 14, color: '#666', marginBottom: 4 },
   cuisine: { fontSize: 14, color: '#FF6B35', fontWeight: '500', marginBottom: 12 },
-  linksRow: { flexDirection: 'row', gap: 12, marginBottom: 8 },
+  linksRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 8 },
   linkBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#f5f5f5', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
   linkText: { fontSize: 14, color: '#FF6B35', fontWeight: '500' },
   linksRowLast: { marginBottom: 20 },
